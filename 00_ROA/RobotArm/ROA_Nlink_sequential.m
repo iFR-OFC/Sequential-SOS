@@ -96,10 +96,10 @@ for jj = 1:noRuns
     % store the last cost-function-value
     fval_array(jj,n-1)        = full(sol.f);
     iteration_array(jj,n-1)   = length(S.stats.single_iterations);
-    solStatus_array{jj,n-1}   = S.stats.solutionStatus;
+    solStatus_array{jj,n-1}   = S.stats.solution_status;
     solverStats{jj,n-1}       = {S.stats.single_iterations};
     % total solver time over all iterations
-    solverTimes_total(jj,n-1) = S.stats.totalSolveTime;
+    solverTimes_total(jj,n-1) = S.stats.total_solve_time;
     buildTimes(jj,n-1)        = tempBuildTime;
      
     end % end for-loop (inner)

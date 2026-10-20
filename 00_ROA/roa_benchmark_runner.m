@@ -25,7 +25,6 @@ addpath("12State/")
 
 commonOpts.maxiter       = 350;
 commonOpts.tolerance_opt = 1e-4;
-% maximum allowable solve time; assigned to failed solves (Clarabel convention)
 commonOpts.maxSolveTime  = 3600;
 
 
@@ -147,10 +146,12 @@ ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
 legend('$ \theta(\xi_{k})$','$\epsilon_\mathrm{con}$','eps')
 
 end
+
 %% F/A-18
 
-degV = {2,2:4,2:4};
-degS = {2,2,2:4};
+degV = {2, 2:4, 2:4};
+degS = {2,   2, 2:4};
+
 
 for kk = 1:numel(degV)
 % generate problem structure (dynamics, polynomial dec. variables)
@@ -267,7 +268,7 @@ for p = 1:n_p
     % coordinate-descent run of problem p
     solStruct_cd  = cdSolverStructs{p};
     % store the computing times t_{p,s} of both solvers
-    t_ps(p, :) = [solStruct_seq.stats.totalSolveTime, solStruct_cd.stats.totalSolveTime];
+    t_ps(p, :) = [solStruct_seq.stats.total_solve_time, solStruct_cd.stats.totalSolveTime];
 end
 
 % logical matrix: solved_ps(p,s) = true iff solver s solves problem p

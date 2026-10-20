@@ -153,7 +153,7 @@ l = 1e-6*(x'*x);
 opts = struct('sossol','mosek');
 opts.verbose  = 1;
 opts.max_iter = 100;
-% opts.conVioCheck = 'sampling';
+% opts.con_vio_check = 'sampling';
 %opts.sossol_options.newton_solver = [];
 
 % sample in constrained set
@@ -177,7 +177,7 @@ gfun = to_function(g);
 
 gval = full(gfun(xsample_cell{:}));
 idx = find(gval <= 0);
-opts.userSample = xsample(:,idx(1:1000));
+opts.user_sample = xsample(:,idx(1:1000));
 
 b     = casos.PS.sym('b');
 

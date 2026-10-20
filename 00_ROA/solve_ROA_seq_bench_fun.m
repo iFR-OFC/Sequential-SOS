@@ -11,10 +11,11 @@ V  = probStruct.V;
 b  = probStruct.b;
 
 %% setup solver
+
 % options
-opts = struct('sossol','mosek');
-opts.max_iter = commonOpts.maxiter;
-opts.almostOptCount = 10;
+opts                              = struct('sossol','mosek');
+opts.max_iter                     = commonOpts.maxiter;
+opts.almost_opt_count             = 10;
 opts.sossol_options.newton_solver = [];
 
 
@@ -25,8 +26,8 @@ l = 1e-6*(x'*x);
 cost = dot(g-(V-b),g-(V-b)) ;
 
 sos = struct('x',[V; s1],... % decision variables
-    'f',cost, ...              % cost
-    'p',[]);                   % parameter
+    'f',cost, ...            % cost
+    'p',[]);                 % parameter
 
 % SOS constraints
 sos.('g') = [s1;
@@ -37,7 +38,6 @@ sos.('g') = [s1;
 % states + constraint cones
 opts.Kx      = struct('lin', length(sos.x));
 opts.Kc      = struct('sos', length(sos.g));
-% opts.sossol_options.newton_solver =[];
 
 % setup solver
 S = casos.nlsossol('S1','sequential',sos,opts);
@@ -49,7 +49,7 @@ sol = S('x0' ,x0);
 
 solStruct.sol   = sol;
 solStruct.stats = S.stats;
-solStruct.inf0  =  S.info;
+solStruct.info  =  S.info;
 
 
 end

@@ -7,7 +7,6 @@ A_cl = subs(nabla(f,x),x,zeros(4,1));
 
 P = lyap(full(A_cl)',eye(4));
 
-
 Vval = x'*P*x;
 
 % initial guess

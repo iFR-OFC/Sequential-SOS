@@ -81,10 +81,6 @@ for iter = 1:maxIter
     %% s1-step
     s1start = tic;
 
-    if iter == 1
-        s1val = x0(2);
-    else
-
         sol1 = S1('p',Vval);
 
         if strcmp(S1.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS')
@@ -94,16 +90,17 @@ for iter = 1:maxIter
             % if we just made a few iterations and become infeasible we
             % assume
             if iter <= 1
-                fprintf('Infeasible in solver 1 in iteration %d \n',iter)
+                
+                s1val = x0(2);
+
+                fprintf('Infeasible in solver 1 in iteration %d. We provide aanother guess. \n',iter)
                 UNIFIED_RETURN_STATUS = S1.stats.UNIFIED_RETURN_STATUS;
             else
                 fprintf('Infeasible in solver 1 in iteration %d; retaining previous iterate\n', iter);
                 UNIFIED_RETURN_STATUS = old_UNIFIED_RETURN_STATUS1;
-
+                break
             end
-            break
         end
-    end
 
 
     solvetime_all1(iter) =  toc(s1start);

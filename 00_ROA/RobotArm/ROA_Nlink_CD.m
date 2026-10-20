@@ -175,7 +175,7 @@ for jj = 1:noRuns
         if S_step_success  && V_step_success
             fval_array(jj,n-1)        = full(sol2.f);
             iteration_array(jj,n-1)   = iter;
-            % solStatus_array{jj,n-1}   = S2.stats.solutionStatus;
+            % solStatus_array{jj,n-1}   = S2.stats.solution_status;
             solverStats{jj,n-1}       = {{S1.info.sdpsol.conic,S2.info.sdpsol.conic}};
             % total solver time over all iterations
             solverTimes_total(jj,n-1) = sum(solvetime_all1) + sum(solvetime_all2) + sum(solvetime_all3);
@@ -187,7 +187,7 @@ for jj = 1:noRuns
                 fval_array(jj,n-1)        = -1;
             end
             iteration_array(jj,n-1)   = iter;
-            % solStatus_array{jj,n-1}   = S2.stats.solutionStatus;
+            % solStatus_array{jj,n-1}   = S2.stats.solution_status;
             if S_step_success == 0
                 solverStats{jj,n-1}       = {{S1.info.sdpsol.conic}};
             else

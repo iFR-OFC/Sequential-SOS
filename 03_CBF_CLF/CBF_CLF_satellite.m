@@ -191,11 +191,11 @@ counterLineserchSteps = nan(S.stats.iterations,1);
 counterFeasRes = nan(S.stats.iterations,1);
 for k = 1:S.stats.iterations
     cost(k) = S.stats.single_iterations{k}.cost;
-    maxConVio(k) = S.stats.single_iterations{k}.maxConVio;
-    alpha(k) = S.stats.single_iterations{k}.stepLength;
-    counterFeasRes(k) = S.stats.single_iterations{k}.counterFeasRes;
-    counterSoC(k) = S.stats.single_iterations{k}.counterSoC;
-    counterLineserchSteps(k) = S.stats.single_iterations{k}.counterLineserchSteps;
+    maxConVio(k) = S.stats.single_iterations{k}.max_con_vio;
+    alpha(k) = S.stats.single_iterations{k}.step_length;
+    counterFeasRes(k) = S.stats.single_iterations{k}.counter_restoration_calls;
+    counterSoC(k) = S.stats.single_iterations{k}.counter_correction_calls;
+    counterLineserchSteps(k) = S.stats.single_iterations{k}.counter_linesearch_calls;
 end
 
 
