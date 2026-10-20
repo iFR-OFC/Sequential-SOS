@@ -37,7 +37,7 @@ All folder contain the script for either the sequential SOS or coordinate-descen
 ## Citation
 Please cite the following paper, if you use the sequential algorithm.
 
-> J. Olucak and T. Cunis , ‘Sequential Quadratic Sum-of-squares Programming for Nonlinear Control Systems’,  submitted to IEEE  Transactions on Control Systems Technology, 2026. Pre-print:(https://arxiv.org/abs/2602.02394)
+> J. Olucak and T. Cunis , ‘On the Practical Implementation of a Sequential Quadratic Programming Algorithm for Nonconvex Sum-of-squares Problems’,  submitted to Mathematical Programming Computation, 2026. Pre-print:(https://arxiv.org/abs/2602.02394)
 
 
 <details>
