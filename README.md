@@ -7,14 +7,16 @@ Sum-of-squares Problems" submitted to Mathematical Programming Computation. The 
 It contains the case benchmarks for different nonconvex sum-of-squares problems, with focus on analysis and control problems. The paper proposes a sequential quadratic programming like solver to tackle nonconvex sum-of-squares problems. 
 This repository cotains the scripts to reproduce the benchmarks.
 
-### Requirements and Setup
+### General Requirements and Setup
 The benchmarks itself does not not need to be installed. Only a [stable version](https://github.com/ifr-acso/casos/releases/latest) of CaΣoS, [MOSEK](https://www.mosek.com/downloads/) v11.1 is needed and CasADi v3.8.1 are required. 
 
   1. Download CasADi v3.8.1 and add it to your Matlab path.
   2. Download and install MOSEK, and add the solver to the Matlab path.
   3. Add the CaΣoS root folder (the one that contains the directory +casos) to your Matlab path.
 
-If installed correctly, you can excute the corresponding files as outlined below for reproduction.
+If installed correctly, you can excute the corresponding files as outlined below for reproduction. The benchmarks in the  [paper](https://arxiv.org/pdf/2602.02394) were executed with MATLAB 2026a
+on a computer with Windows 11 running on an AMD Ryzen 9 5950X 16-Core Processor with 3.40 GHz and 128 GB RAM.
+
 
 ### Folder Structure
 
