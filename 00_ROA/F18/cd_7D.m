@@ -202,39 +202,46 @@ fval_old = [];
 relbistol = 1e-3;
 absbistol = 1e-3;
 
-
+maxIter = 500;
+% after initial guess, leave the level set constant
+bval =1;
 %% V-s-iteration
-for iter = 1:100
+for iter = 1:maxIter
 
     %% s1-step
     s1start = tic;
 
+    % if iter == 1
+    %     %% initial guess for feasible level set; simple bisection
+    %     lb = 0;
+    %     ub = 100;
+    %     while  (ub-lb>absbistol && ub-lb > relbistol*abs(lb))
+    % 
+    %         ptry = (ub+lb)/2;
+    % 
+    %         sol0 = S0('p',[Vval;ptry]);
+    % 
+    %         switch(S0.stats.UNIFIED_RETURN_STATUS)
+    %             case {'SOLVER_RET_SUCCESS'}
+    %                       lb = ptry;
+    %                      s1val  = sol0.x;
+    %                      break; % take the first feasible level set
+    %             case {'SOLVER_RET_INFEASIBLE','SOLVER_RET_NAN','SOLVER_RET_UNKNOWN'}
+    %                       ub = ptry;
+    %             otherwise 
+    %                    error('Finding a feasible level set failed!')
+    %         end
+    %     end
+    % 
+    % else
+
     if iter == 1
-        %% initial guess for feasible level set; simple bisection
-        lb = 0;
-        ub = 100;
-        while  (ub-lb>absbistol && ub-lb > relbistol*abs(lb))
-
-            ptry = (ub+lb)/2;
-
-            sol0 = S0('p',[Vval;ptry]);
-
-            switch(S0.stats.UNIFIED_RETURN_STATUS)
-                case {'SOLVER_RET_SUCCESS'}
-                          lb = ptry;
-                         s1val  = sol0.x;
-                         break; % take the first feasible level set
-                case {'SOLVER_RET_INFEASIBLE','SOLVER_RET_NAN','SOLVER_RET_UNKNOWN'}
-                          ub = ptry;
-                otherwise 
-                       error('Finding a feasible level set failed!')
-            end
-        end
-       
+        s1val = x'*x;
     else
             sol1 = S1('p',[Vval;bval]);
             s1val  = sol1.x;
     end
+    % end
 
     solvetime_all1(iter) =  toc(s1start);
 
@@ -249,13 +256,10 @@ for iter = 1:100
     % extract solution
     Vval = sol2.x(1);
 
-    % after initial guess, leave the level set constant
-    bval =1;
-
     % show progress
     fprintf('Iteration %d: f = %g, g = %g.\n',iter,full(sol2.f),full(sol2.x(2) ));
 
-
+    cost_CD(iter) = full(sol2.f);
     if ~isempty(fval_old)
         if abs(full(sol2.f-fval_old)) <= 1e-4
             break
@@ -277,8 +281,9 @@ fprintf('Total build time is %.2f s\n',totalBuildTime)
 fprintf('----------------------------------- \n')
 fprintf('Total time is %.2f s\n',totalBuildTime+totalSolveTime)
 
-save('CD_F18_complete_WS.mat')
-
+% save('CD_F18_complete_WS.mat')
+cost_CD2 = cost_CD;
+save('CD_iter_7states2.mat',"cost_CD2")
 %% plotting
 figure
 

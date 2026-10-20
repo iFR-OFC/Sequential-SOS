@@ -134,9 +134,9 @@ V = casos.PS.sym('v',monomials(x,2:4));
 
 % SOS multiplier
 s1    = casos.PS.sym('s1',monomials(x,4));
-s2    = casos.PS.sym('s2',monomials(x,0),[2 1]);
-s3    = casos.PS.sym('s3',monomials(x,0),[2 1]);
-s4    = casos.PS.sym('s4',monomials(x,0:2));
+s2    = casos.PS.sym('s2',monomials(x,2),[2 1]);
+s3    = casos.PS.sym('s3',monomials(x,2),[2 1]);
+s4    = casos.PS.sym('s4',monomials(x,2));
 
 kappa1 = casos.PS.sym('k',monomials([x(1)],1));
 kappa2 = casos.PS.sym('k',monomials([x(3)],1));
@@ -154,7 +154,7 @@ opts = struct('sossol','mosek');
 opts.verbose  = 1;
 opts.max_iter = 100;
 % opts.conVioCheck = 'sampling';
-opts.sossol_options.newton_solver = [];
+%opts.sossol_options.newton_solver = [];
 
 % sample in constrained set
 a = -1;
@@ -206,8 +206,9 @@ opts.Kc      = struct('sos', length(sos.g));
 opts.sossol_options.newton_solver =[];
 
 % setup solver
+profile on
 S = casos.nlsossol('S1','sequential',sos,opts);
-
+profile viewer
 %% solve problem
 
 % initial guess

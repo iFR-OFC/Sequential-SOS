@@ -21,7 +21,7 @@
 
 clear
 close all
-clc
+% clc
 
 % system states
 x = casos.PS('x',6,1);
@@ -148,7 +148,7 @@ sos.('g') = [
 % states + constraint are linear/SOS cones
 opts.Kx = struct('lin', length(sos.x));
 opts.Kc = struct('sos', length(sos.g));
-opts.sossol_options.newton_solver = []; % turn off monomial reduction
+opts.sossol_options.newton_solver = []; 
 
 % solver setup
 S  = casos.nlsossol('S','sequential',sos,opts);
@@ -178,8 +178,36 @@ K       = -sol.x(3:5).*x(1:3)-sol.x(6:8).*x(4:6);
 Ksol_re = subs(K,x,Dx*x);
 
 
-S.stats
-S.stats.single_iterations{end}.conic.size_A
+S.info.sossol_convex.gram.Kc
+
+
+
+%% Eval
+cost      = nan(S.stats.iterations,1);
+maxConVio = nan(S.stats.iterations,1);
+alpha     = nan(S.stats.iterations,1);
+counterSoC = nan(S.stats.iterations,1);
+counterLineserchSteps = nan(S.stats.iterations,1);
+counterFeasRes = nan(S.stats.iterations,1);
+for k = 1:S.stats.iterations
+    cost(k) = S.stats.single_iterations{k}.cost;
+    maxConVio(k) = S.stats.single_iterations{k}.maxConVio;
+    alpha(k) = S.stats.single_iterations{k}.stepLength;
+    counterFeasRes(k) = S.stats.single_iterations{k}.counterFeasRes;
+    counterSoC(k) = S.stats.single_iterations{k}.counterSoC;
+    counterLineserchSteps(k) = S.stats.single_iterations{k}.counterLineserchSteps;
+end
+
+
+% Plot convergence diagnostics
+figure
+tiledlayout(1,2)
+nexttile, semilogy(abs(cost(2:end)-cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
+      plot([0 S.stats.iterations],[S.stats.options.tolerance_opt S.stats.options.tolerance_opt],'k--','LineWidth',1.2)    
+nexttile, semilogy(maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on 
+plot([0 S.stats.iterations],[S.stats.options.tolerance_con S.stats.options.tolerance_con],'k--','LineWidth',1.2)
+% nexttile, plot(alpha,'LineWidth',1.2), grid on, title('Step length')
+% nexttile, plot(counterSoC,'LineWidth',1.2), grid on, title('SoC iterations')
 
 % %% plotting
 % import casos.toolboxes.sosopt.*

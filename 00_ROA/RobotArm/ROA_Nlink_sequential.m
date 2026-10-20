@@ -28,12 +28,12 @@ for jj = 1:noRuns
     % iterate of the Number of links
     for n = 2:Nmax
     
-    disp(['Compute maximum ROA for the ' num2str(n) '-link pendulum'])
+    disp(['Compute maximum ROA for the ' num2str(n) '-link nLinkRobot'])
     
     x = casos.PS('x',2*n,1);
     
     % get dynamics
-    f = feval(['pendulum_dyn_poly_n' num2str(n) '_d' num2str(deg)],x);
+    f = feval(['nLinkRobot_dyn_poly_n' num2str(n) '_d' num2str(deg)],x);
     
     % load P matrix
     load(['data_n' num2str(n)],'P');
@@ -90,7 +90,7 @@ for jj = 1:noRuns
     tempBuildTime = toc(buildTimes_start);
 
     
-    sol = S('x0',casos.PD([Vval,(x'*x)]));
+    sol = S('x0',casos.PD([Vval;(x'*x)]));
     
 
     % store the last cost-function-value

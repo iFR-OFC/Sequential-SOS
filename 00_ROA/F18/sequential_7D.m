@@ -16,6 +16,11 @@
 %
 %   License: GNU GENERAL PUBLIC LICENSE Version 3
 %--------------------------------------------------------------------------
+set(groot, ...
+    'defaultTextInterpreter', 'latex', ...
+    'defaultAxesTickLabelInterpreter', 'latex', ...
+    'defaultLegendInterpreter', 'latex');
+
 close all
 clear
 clc
@@ -141,9 +146,10 @@ opts = struct('sossol','mosek');
 opts.verbose  = 1;
 opts.max_iter = 100;
 opts.almostOptCount = 10;
-opts.tolerance_con = 1e-4;
+% opts.tolerance_con = 1e-4;
 % opts.conVioCheck = 'sampling';
-opts.sossol_options.newton_solver = [];
+
+opts.sossol_options.newton_solver = []; 
 
 
 % b     = casos.PS.sym('b');
@@ -165,7 +171,7 @@ sos.('g') = [s1;
 % states + constraint cones
 opts.Kx      = struct('lin', length(sos.x));
 opts.Kc      = struct('sos', length(sos.g));
-opts.sossol_options.newton_solver =[];
+% opts.sossol_options.newton_solver =[];
 
 % setup solver
 S = casos.nlsossol('S1','sequential',sos,opts);
@@ -175,7 +181,7 @@ S = casos.nlsossol('S1','sequential',sos,opts);
 
 A_cl = subs(nabla(f,x),x,zeros(7,1));
 
-P = lyap(full(A_cl),eye(7));
+P = lyap(full(A_cl)',eye(7));
 
 Vval = x'*P*x;
 
@@ -192,5 +198,41 @@ sol = S('x0' ,x0);
 
 S.stats
 
-S.stats.single_iterations{end}.conic
+S.info.sossol_convex.gram.Kc
 
+%%
+cost      = nan(S.stats.iterations,1);
+maxConVio = nan(S.stats.iterations,1);
+alpha     = nan(S.stats.iterations,1);
+counterSoC = nan(S.stats.iterations,1);
+counterLineserchSteps = nan(S.stats.iterations,1);
+counterFeasRes = nan(S.stats.iterations,1);
+for k = 1:S.stats.iterations
+    cost(k) = S.stats.single_iterations{k}.cost;
+    maxConVio(k) = S.stats.single_iterations{k}.maxConVio;
+    alpha(k) = S.stats.single_iterations{k}.stepLength;
+    counterFeasRes(k) = S.stats.single_iterations{k}.counterFeasRes;
+    counterSoC(k) = S.stats.single_iterations{k}.counterSoC;
+    counterLineserchSteps(k) = S.stats.single_iterations{k}.counterLineserchSteps;
+end
+
+
+load CD_iter_7states.mat
+load CD_iter_7states2.mat
+maxConVio(maxConVio == 0) = eps;
+% Plot convergence diagnostics
+figure
+tiledlayout(1,2)
+nexttile, semilogy(abs(cost(2:end)-cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
+semilogy(abs(cost_CD(2:end)-cost_CD(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
+semilogy(abs(cost_CD2(2:end)-cost_CD2(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
+      plot([0 length(cost_CD)],[S.stats.options.tolerance_opt S.stats.options.tolerance_opt],'k--','LineWidth',1.2) 
+      xlabel('Iterations')
+      ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
+      legend('Sequential','Coordinate-descent','$\epsilon_\mathrm{opt}$')
+nexttile, semilogy(maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on 
+plot([0 S.stats.iterations],[S.stats.options.tolerance_con S.stats.options.tolerance_con],'k--','LineWidth',1.2)
+plot([0 S.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
+xlabel('Iterations')
+ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
+legend('$ \theta(\xi_{k})$','$\epsilon_\mathrm{con}$','eps')

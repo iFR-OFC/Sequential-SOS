@@ -15,13 +15,13 @@ clc
 close all
 clear
 
-addpath("pendulum\")
+addpath("robot/")
 deg    = 2;
 noRuns = 1;
-Nmax   = 12;  % n = 2*N 
+Nmax   = 4;  % n = 2*N 
 
 % set to false to re-run benchmark
-evaluteOnlyFlag = true;
+evaluteOnlyFlag = false;
 % set to true to generate tikz figure using MATLAB2TIKZ
 genTikz = false;
 
@@ -63,7 +63,7 @@ runs = 2:Nmax;
 figure('Name', 'Realtive improvement regarding solve times and iterations')
 subplot(211)
 hold on
-rel_solveTime = (solverTimes_total_CD(idx_infes_cd)'-solverTimes_total_Seq)./solverTimes_total_CD(idx_infes_cd)'*100;
+rel_solveTime = (solverTimes_total_CD(idx_infes_cd)'-solverTimes_total_Seq')./solverTimes_total_CD(idx_infes_cd)'*100;
 mean_solveTimeRel = mean(rel_solveTime);
 yline(mean_solveTimeRel)
 hold on
@@ -76,7 +76,7 @@ xticks((2:Nmax)*2)
 % plot iterations (no subiterations of feasibiltity restoration)
 subplot(212)
 hold on
-rel_iteration = (iteration_array_CD(idx_infes_cd)'-iteration_array_Seq)./iteration_array_CD(idx_infes_cd)'*100;
+rel_iteration = (iteration_array_CD(idx_infes_cd)'-iteration_array_Seq')./iteration_array_CD(idx_infes_cd)'*100;
 mean_rel_iteration = mean(rel_iteration);
 yline(mean_rel_iteration)
 hold on
@@ -89,7 +89,7 @@ xticks((2:Nmax)*2)
 
 if genTikz 
 cleanfigure();
-matlab2tikz('NlinkPendulum.tex','width','\figW','height','\figH')
+matlab2tikz('NlinkRobot.tex','width','\figW','height','\figH')
 end
 
 
@@ -137,7 +137,6 @@ for j = 1:length(solverStats_Seq)
    n_con(j) = solverStats_Seq{j}{1}{end}.conic.size_A(1);
    n_dec(j) = solverStats_Seq{j}{1}{end}.conic.size_A(2);
 end
-
 
 
 %% generate tables

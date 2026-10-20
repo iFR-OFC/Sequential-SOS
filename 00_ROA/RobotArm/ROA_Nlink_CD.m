@@ -24,12 +24,12 @@ for jj = 1:noRuns
     % iterate of the Number of links
     for n = 2:Nmax
 
-        disp(['Compute maximum ROA for the ' num2str(n) '-link pendulum'])
+        disp(['Compute maximum ROA for the ' num2str(n) '-link nLinkRobot'])
 
         x = casos.PS('x',2*n,1);
 
         % get dynamics
-        f = feval(['pendulum_dyn_poly_n' num2str(n) '_d' num2str(deg)],x);
+        f = feval(['nLinkRobot_dyn_poly_n' num2str(n) '_d' num2str(deg)],x);
 
         % load P matrix
         load(['data_n' num2str(n)],'P');
@@ -176,7 +176,7 @@ for jj = 1:noRuns
             fval_array(jj,n-1)        = full(sol2.f);
             iteration_array(jj,n-1)   = iter;
             % solStatus_array{jj,n-1}   = S2.stats.solutionStatus;
-            solverStats{jj,n-1}       = {{S1.stats.conic,S2.stats.conic}};
+            solverStats{jj,n-1}       = {{S1.info.sdpsol.conic,S2.info.sdpsol.conic}};
             % total solver time over all iterations
             solverTimes_total(jj,n-1) = sum(solvetime_all1) + sum(solvetime_all2) + sum(solvetime_all3);
             buildTimes(jj,n-1)        = tempBuildTime;% + sum(callTime1) + sum(callTime2) + sum(callTime3);
@@ -189,9 +189,9 @@ for jj = 1:noRuns
             iteration_array(jj,n-1)   = iter;
             % solStatus_array{jj,n-1}   = S2.stats.solutionStatus;
             if S_step_success == 0
-                solverStats{jj,n-1}       = {{S1.stats.conic}};
+                solverStats{jj,n-1}       = {{S1.info.sdpsol.conic}};
             else
-                solverStats{jj,n-1}       = {{S1.stats.conic,S2.stats.conic}};
+                solverStats{jj,n-1}       = {{S1.info.sdpsol.conic,S2.info.sdpsol.conic}};
             end
             % total solver time over all iterations
             solverTimes_total(jj,n-1) = sum(solvetime_all1) + sum(solvetime_all2) + sum(solvetime_all3);

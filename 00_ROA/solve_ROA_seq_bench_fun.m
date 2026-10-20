@@ -1,0 +1,57 @@
+
+function [solStruct] = solve_ROA_seq_bench_fun(probStruct,commonOpts,x0)
+
+
+
+x  = probStruct.x;
+f  = probStruct.f;
+g  = probStruct.g;
+s1 = probStruct.s1;
+V  = probStruct.V;
+b  = probStruct.b;
+
+%% setup solver
+% options
+opts = struct('sossol','mosek');
+opts.max_iter = commonOpts.maxiter;
+opts.almostOptCount = 10;
+opts.sossol_options.newton_solver = [];
+
+
+% enforce positivity
+l = 1e-6*(x'*x);
+
+% cost
+cost = dot(g-(V-b),g-(V-b)) ;
+
+sos = struct('x',[V; s1],... % decision variables
+    'f',cost, ...              % cost
+    'p',[]);                   % parameter
+
+% SOS constraints
+sos.('g') = [s1;
+    V-l;
+    s1*(V-b)-nabla(V,x)*f-l;
+    ];
+
+% states + constraint cones
+opts.Kx      = struct('lin', length(sos.x));
+opts.Kc      = struct('sos', length(sos.g));
+% opts.sossol_options.newton_solver =[];
+
+% setup solver
+S = casos.nlsossol('S1','sequential',sos,opts);
+
+%% solve problem
+
+% solve problem
+sol = S('x0' ,x0);
+
+solStruct.sol   = sol;
+solStruct.stats = S.stats;
+solStruct.inf0  =  S.info;
+
+
+end
+
+
