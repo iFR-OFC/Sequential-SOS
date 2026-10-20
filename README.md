@@ -1,4 +1,4 @@
-# Sequential-SOS-Nonlinear-Control
+# On the Practical Implementation of a Sequential Quadratic Programming Algorithm for Nonconvex Sum-of-squares Problems
 [![Identifier](https://img.shields.io/badge/doi-10.18419%2Fdarus--5677-d45815.svg)](https://doi.org/10.18419/darus-5677)
 
 This repository supplements the paper "On the Practical Implementation of a Sequential
@@ -9,9 +9,9 @@ It contains the case benchmarks for different nonconvex sum-of-squares problems,
 ### Requirements and Setup
 The benchmarks itself does not not need to be installed. Only a [stable version](https://github.com/ifr-acso/casos/releases/latest) of CaΣoS, [MOSEK](https://www.mosek.com/downloads/) v11.1 is needed and CasADi v3.8.1 are required. 
 
-  1.  Download CasADi v3.8.1 and add it to your Matlab path.
+  1. Download CasADi v3.8.1 and add it to your Matlab path.
   2. Download and install MOSEK, and add the solver to the Matlab path.
-  3.   Add the CaΣoS root folder (the one that contains the directory +casos) to your Matlab path.
+  3. Add the CaΣoS root folder (the one that contains the directory +casos) to your Matlab path.
 
 If installed correctly, you can excute the corresponding files as outlined below for reproduction.
 
