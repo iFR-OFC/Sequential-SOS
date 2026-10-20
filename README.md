@@ -1,13 +1,15 @@
 # Sequential-SOS-Nonlinear-Control
 [![Identifier](https://img.shields.io/badge/doi-10.18419%2Fdarus--5677-d45815.svg)](https://doi.org/10.18419/darus-5677)
 
-This repository supplements the paper "Sequential Quadratic Sum-of-squares Programming for Nonlinear Control Systems" submitted to IEEE  Transactions on Control Systems Technology. The preprint can be found on [arxiv](https://arxiv.org/abs/2602.02394).
-It contains the case studies for different analysis and control problems.
+This repository supplements the paper "On the Practical Implementation of a Sequential
+Quadratic Programming Algorithm for Nonconvex
+Sum-of-squares Problems" submitted to Mathematical Programming Computation. The preprint can be found on [arxiv](https://arxiv.org/pdf/2602.02394).
+It contains the case benchmarks for different nonconvex sum-of-squares problems, with focus on analysis and control problems.
 
 ### Requirements and Setup
-The example package itself does not not need to be installed. Only a [stable version](https://github.com/ifr-acso/casos/releases/latest) of CaΣoS, [MOSEK](https://www.mosek.com/downloads/) v11.1 is needed and CasADi v3.6.7 are required. 
+The benchmarks itself does not not need to be installed. Only a [stable version](https://github.com/ifr-acso/casos/releases/latest) of CaΣoS, [MOSEK](https://www.mosek.com/downloads/) v11.1 is needed and CasADi v3.8.1 are required. 
 
-  1.  Download CasADi v3.6.x and add it to your Matlab path.
+  1.  Download CasADi v3.8.1 and add it to your Matlab path.
   2. Download and install MOSEK, and add the solver to the Matlab path.
   3.   Add the CaΣoS root folder (the one that contains the directory +casos) to your Matlab path.
 
@@ -42,8 +44,8 @@ Please cite the following paper, if you use the sequential algorithm.
 <summary>Bibtex entry</summary>
 
 ```bibtex
-@misc{olucak2026sequentialquadraticsumofsquaresprogramming,
-      title={Sequential Quadratic Sum-of-squares Programming for Nonlinear Control Systems}, 
+@misc{olucak2026practicalimplementationsequentialquadratic,
+      title={On the Practical Implementation of a Sequential Quadratic Programming Algorithm for Nonconvex Sum-of-squares Problems}, 
       author={Jan Olucak and Torbjørn Cunis},
       year={2026},
       eprint={2602.02394},
