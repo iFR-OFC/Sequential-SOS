@@ -4,7 +4,8 @@
 This repository supplements the paper "On the Practical Implementation of a Sequential
 Quadratic Programming Algorithm for Nonconvex
 Sum-of-squares Problems" submitted to Mathematical Programming Computation. The preprint can be found on [arxiv](https://arxiv.org/pdf/2602.02394).
-It contains the case benchmarks for different nonconvex sum-of-squares problems, with focus on analysis and control problems.
+It contains the case benchmarks for different nonconvex sum-of-squares problems, with focus on analysis and control problems. The paper proposes a sequential quadratic programming like solver to tackle nonconvex sum-of-squares problems. 
+This repository cotains the scripts to reproduce the benchmarks.
 
 ### Requirements and Setup
 The benchmarks itself does not not need to be installed. Only a [stable version](https://github.com/ifr-acso/casos/releases/latest) of CaΣoS, [MOSEK](https://www.mosek.com/downloads/) v11.1 is needed and CasADi v3.8.1 are required. 
