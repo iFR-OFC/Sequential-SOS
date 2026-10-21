@@ -1,5 +1,5 @@
 
-function [probStruct] = generateAircraft_benchmark(degV,degS)
+function [probStruct] = generateAircraft_probStruct(degV,degS)
 
 x = casos.Indeterminates('x',4);
 

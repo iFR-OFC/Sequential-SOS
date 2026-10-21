@@ -1,11 +1,26 @@
 %% ***********************************************************************
 %
 %  Region-of-attraction Estimation Benchmark Test Runner
-% 
-%  Run 1: Van-der-Pol Oscillator 
-%  Run 2: Aircraft 4D
-%  Run 3: F-18
-%  Run 4: Network
+%
+%  Benchmark 1: Van-der-Pol Oscillator
+%  Benchmark 2: Multi-Input-Multi-Output
+%  Benchmark 3: Double Pendulum
+%  Benchmark 4: Aircraft
+%  Benchmark 5: F-18
+%  Benchmark 6: Network
+%
+%  Note 1: Each runs uses various combinations of polynomial degrees. For SOS
+%  problem to be feasible or to improve solution quality higher degree are
+%  needed. Hence, with a higher degree more decision variables occur and
+%  the Gram matrices become larger. Therefore, we can check the behavior
+%  for over several benchmark problems, i.e., we have sub-benchmarks so to
+%  say that increase our benchmark set.
+%
+%  Note 2: The user might select a second hessian approximation method for
+%  sequential. This is optional, but interesting in terms of convergence
+%  speed.
+%  
+%
 %
 % ***********************************************************************
 set(groot, ...
@@ -17,271 +32,632 @@ close all
 clear
 clc
 
+% add the problem specific folders
 addpath("F18/")
 addpath("VDP/")
-addpath("Aircraft_4D/")
-addpath("12State/")
+addpath("MultiInput/")
+addpath("DoublePendulum/")
+addpath("Aircraft/")
+addpath("Network/")
 
+% enable plotting of convergence for each run
+enable_plot_convergence = true;
+enable_second_sequential = true;
 
+% Hessian estimation methods of the sequential solver to compare
+hess_est_method_1 = 'regularization'; % our default (see also sequentialCommon.m)
+hess_est_method_2 = 'BFGS';      % 'BFGS', 'levenberg', 'mirroring'
+
+% common options shared by the methods
 commonOpts.maxiter       = 350;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
 
+% initialize the cell array that accumulates one row per run of the results table
+tableRows = cell(0, 12);
+
+% variable names of the results table (one row per run)
+tableVariableNames = {'Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
+    'Build Time (CD)','Build Time (SQ)','Solve Time (CD)','Solve Time (SQ)', ...
+    'Iterations (CD)','Iterations (SQ)','Final Cost (CD)','Final Cost (SQ)'};
+
 
 %% VDP
 
-% generate problem structure (dynamics, polynomial dec. variables)
+% define the problem instances based on different polynomial degrees
 degV = {2,2:4,1:4,2:6};
 degS = {2,2,2:4,2:4};
 
 % initialize the cell arrays of stored runs (one entry per run)
-seqSolverStructs = {};
+seqSolverStructs_regularization = {};
+seqSolverStructs_hessApprox2 = {};
 cdSolverStructs  = {};
 
 for kk = 1:numel(degV)
 
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_VDP = generateVDP_probStruct(degV{kk},degS{kk});
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_VDP.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
 
-probStruct_VDP = generateVDP_benchmark(degV{kk},degS{kk});
-fprintf('-------------------------------------------------- \n')
-fprintf('Run 1 - Region-of-Attraction for %s. \n',probStruct_VDP.Name)
-fprintf('-------------------------------------------------- \n')
+    % generate an initial guess
+    x0 = generate_initGuess_VDP(probStruct_VDP);
 
-% generate an initial guess
-x0 = generate_initGuess_VDP(probStruct_VDP);
+    % solve VDP example with two states using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_VDP_regularization = solve_ROA_seq_bench_fun(probStruct_VDP,commonOpts,x0,hess_est_method);
 
-% solve VDP example with two states using sequential SOS
-solStruct_seq_VDP     = solve_ROA_seq_bench_fun(probStruct_VDP,commonOpts,x0);
+    seqSolverStructs_regularization{end+1} = solStruct_seq_VDP_regularization;
 
-seqSolverStructs{end+1} = solStruct_seq_VDP;
+    % extract size and timing statistic from sequential
+    evalSequentialStruct_VDP_regularization = evalSequential(solStruct_seq_VDP_regularization);
 
-% extract size and timing statistic from sequential
-evalSequentialStruct_VDP = evalSequential(solStruct_seq_VDP);
+    if enable_second_sequential
 
-% solve VDP example with two states using custom coordinate-descent
-solStruct_CD_VDP = solve_ROA_CD_bench_fun(probStruct_VDP,commonOpts,x0);
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_VDP_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_VDP,commonOpts,x0,hess_est_method);
 
-cdSolverStructs{end+1} = solStruct_CD_VDP;
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_VDP_hessApprox2;
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_VDP_hessApprox2 = evalSequential(solStruct_seq_VDP_hessApprox2);
+    end
+
+    % solve VDP example with two states using custom coordinate-descent
+    solStruct_CD_VDP = solve_ROA_CD_bench_fun(probStruct_VDP,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_VDP;
 
 
-% Evaluate
+    %% Generate table
 
-% Plot convergence diagnostics
-figure('Name','VDP Benchmark')
-tiledlayout(1,2)
-nexttile
-semilogy(abs(evalSequentialStruct_VDP.cost(2:end)-evalSequentialStruct_VDP.cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
-semilogy(abs(solStruct_CD_VDP.stats.cost(2:end)-solStruct_CD_VDP.stats.cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
-xlabel('Iterations')
-ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
-legend('Sequential','Coordinate-descent')
+    % append the current run to the accumulating results table
+    tableRows = appendResultRow(tableRows,probStruct_VDP,solStruct_CD_VDP,solStruct_seq_VDP_regularization);
 
-% constraint violation of sequential SOS
-% ------------------------------------------------------------------------
-% Note: If we are in the SOS cone, constraint violation is negative if
-% signed distance is used. In that case, constraint violation is set to
-% zero. For plotting on logarithmic scale zero values are set to eps!
-% ------------------------------------------------------------------------
-nexttile, semilogy(evalSequentialStruct_VDP.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on 
-plot([0 solStruct_seq_VDP.stats.iterations],[solStruct_seq_VDP.stats.options.tolerance_con solStruct_seq_VDP.stats.options.tolerance_con],'k--','LineWidth',1.2)
-plot([0 solStruct_seq_VDP.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
-xlabel('Iterations')
-ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
-legend('$ \theta(\xi_{k})$','$\epsilon_\mathrm{con}$','eps')
+    if enable_plot_convergence
+        % Evaluate
+
+        % Plot convergence diagnostics
+        figure('Name','VDP Benchmark')
+        tiledlayout(1,2)
+        nexttile
+        hessLegendNames = {hess_est_method_1};
+        semilogy(abs(evalSequentialStruct_VDP_regularization.cost(2:end)-evalSequentialStruct_VDP_regularization.cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
+        if enable_second_sequential
+            semilogy(abs(evalSequentialStruct_VDP_hessApprox2.cost(2:end)-evalSequentialStruct_VDP_hessApprox2.cost(1:end-1)),'LineWidth',1.2), hold on,
+            hessLegendNames{end+1} = hess_est_method_2;
+        end
+        semilogy(abs(solStruct_CD_VDP.stats.cost(2:end)-solStruct_CD_VDP.stats.cost(1:end-1)),'LineWidth',1.2), hold on,
+        xlabel('Iterations')
+        ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
+        hessLegendNames{end+1} = 'Coordinate-descent';
+        legend(hessLegendNames)
+
+        % constraint violation of sequential SOS
+        % ------------------------------------------------------------------------
+        % Note: If we are in the SOS cone, constraint violation is negative if
+        % signed distance is used. In that case, constraint violation is set to
+        % zero. For plotting on logarithmic scale zero values are set to eps!
+        % ------------------------------------------------------------------------
+        nexttile, semilogy(evalSequentialStruct_VDP_regularization.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on
+        plot([0 solStruct_seq_VDP_regularization.stats.iterations],[solStruct_seq_VDP_regularization.stats.options.tolerance_con solStruct_seq_VDP_regularization.stats.options.tolerance_con],'k--','LineWidth',1.2)
+        if enable_second_sequential
+            semilogy(evalSequentialStruct_VDP_hessApprox2.maxConVio,'LineWidth',1.2), hold on
+            plot([0 solStruct_seq_VDP_hessApprox2.stats.iterations],[solStruct_seq_VDP_hessApprox2.stats.options.tolerance_con solStruct_seq_VDP_hessApprox2.stats.options.tolerance_con],'k--','LineWidth',1.2)
+        end
+        plot([0 solStruct_seq_VDP_regularization.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
+        xlabel('Iterations')
+        ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
+        legend([hessLegendNames(1:end-1), {'$\epsilon_\mathrm{con}$','eps'}])
+    end
 end
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
+
+%% Multi-Input-Multi-Output
+
+% define the problem instances based on different polynomial degrees
+degV = {2, 2:4, 2:4, 2:6};
+degS = {2,   2, 2:4, 2:4};
+
+for kk = 1:numel(degV)
+
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_MiMo = generateMiMo_probStruct(degV{kk},degS{kk});
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_MiMo.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
+
+    % generate an initial guess
+    x0 = generate_initGuess_MiMo(probStruct_MiMo);
+
+    % solve MiMo example with two states using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_MiMo_regularization = solve_ROA_seq_bench_fun(probStruct_MiMo,commonOpts,x0,hess_est_method);
+
+    seqSolverStructs_regularization{end+1} = solStruct_seq_MiMo_regularization;
+
+    % extract size and timing statistic from sequential
+    evalSequentialStruct_MiMo_regularization = evalSequential(solStruct_seq_MiMo_regularization);
+
+    if enable_second_sequential
+
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_MiMo_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_MiMo,commonOpts,x0,hess_est_method);
+
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_MiMo_hessApprox2;
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_MiMo_hessApprox2 = evalSequential(solStruct_seq_MiMo_hessApprox2);
+    end
+
+    % solve MiMo example with two states using custom coordinate-descent
+    solStruct_CD_MiMo = solve_ROA_CD_bench_fun(probStruct_MiMo,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_MiMo;
+
+
+    % Generate table
+
+    % append the current run to the accumulating results table
+    tableRows = appendResultRow(tableRows,probStruct_MiMo,solStruct_CD_MiMo,solStruct_seq_MiMo_regularization);
+
+    if enable_plot_convergence
+        % Evaluate
+
+        % Plot convergence diagnostics
+        figure('Name','MiMo Benchmark')
+        tiledlayout(1,2)
+        nexttile
+        hessLegendNames = {hess_est_method_1};
+        semilogy(abs(evalSequentialStruct_MiMo_regularization.cost(2:end)-evalSequentialStruct_MiMo_regularization.cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
+        if enable_second_sequential
+            semilogy(abs(evalSequentialStruct_MiMo_hessApprox2.cost(2:end)-evalSequentialStruct_MiMo_hessApprox2.cost(1:end-1)),'LineWidth',1.2), hold on,
+            hessLegendNames{end+1} = hess_est_method_2;
+        end
+        semilogy(abs(solStruct_CD_MiMo.stats.cost(2:end)-solStruct_CD_MiMo.stats.cost(1:end-1)),'LineWidth',1.2), hold on,
+        xlabel('Iterations')
+        ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
+        hessLegendNames{end+1} = 'Coordinate-descent';
+        legend(hessLegendNames)
+
+        % constraint violation of sequential SOS
+        % ------------------------------------------------------------------------
+        % Note: If we are in the SOS cone, constraint violation is negative if
+        % signed distance is used. In that case, constraint violation is set to
+        % zero. For plotting on logarithmic scale zero values are set to eps!
+        % ------------------------------------------------------------------------
+        nexttile, semilogy(evalSequentialStruct_MiMo_regularization.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on
+        plot([0 solStruct_seq_MiMo_regularization.stats.iterations],[solStruct_seq_MiMo_regularization.stats.options.tolerance_con solStruct_seq_MiMo_regularization.stats.options.tolerance_con],'k--','LineWidth',1.2)
+        if enable_second_sequential
+            semilogy(evalSequentialStruct_MiMo_hessApprox2.maxConVio,'LineWidth',1.2), hold on
+            plot([0 solStruct_seq_MiMo_hessApprox2.stats.iterations],[solStruct_seq_MiMo_hessApprox2.stats.options.tolerance_con solStruct_seq_MiMo_hessApprox2.stats.options.tolerance_con],'k--','LineWidth',1.2)
+        end
+        plot([0 solStruct_seq_MiMo_regularization.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
+        xlabel('Iterations')
+        ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
+        legend([hessLegendNames(1:end-1), {'$\epsilon_\mathrm{con}$','eps'}])
+    end
+end
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
+
+%% Double Pendulum
+
+% define the problem instances based on different polynomial degrees
+degV = {2;2:4;2:4};
+degS = {2;2;2:4};
+
+for kk = 1:numel(degV)
+
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_DoublePendulum = generateDoublePendulum_probStruct(degV{kk},degS{kk});
+
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_DoublePendulum.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
+
+    % generate an initial guess
+    x0 = generate_initGuess_DoublePendulum(probStruct_DoublePendulum);
+
+    % solve DoublePendulum example with two states using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_DoublePendulum_regularization = solve_ROA_seq_bench_fun(probStruct_DoublePendulum,commonOpts,x0,hess_est_method);
+
+    seqSolverStructs_regularization{end+1} = solStruct_seq_DoublePendulum_regularization;
+
+    % extract size and timing statistic from sequential
+    evalSequentialStruct_DoublePendulum_regularization = evalSequential(solStruct_seq_DoublePendulum_regularization);
+
+    if enable_second_sequential
+
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_DoublePendulum_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_DoublePendulum,commonOpts,x0,hess_est_method);
+
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_DoublePendulum_hessApprox2;
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_DoublePendulum_hessApprox2 = evalSequential(solStruct_seq_DoublePendulum_hessApprox2);
+    end
+
+    % solve DoublePendulum example with two states using custom coordinate-descent
+    solStruct_CD_DoublePendulum = solve_ROA_CD_bench_fun(probStruct_DoublePendulum,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_DoublePendulum;
+
+    %% Generate table
+
+    % append the current run to the accumulating results table
+    tableRows = appendResultRow(tableRows,probStruct_DoublePendulum,solStruct_CD_DoublePendulum,solStruct_seq_DoublePendulum_regularization);
+
+
+    if enable_plot_convergence
+        % Evaluate
+
+        % Plot convergence diagnostics
+        figure('Name','DoublePendulum Benchmark')
+        tiledlayout(1,2)
+        nexttile
+        hessLegendNames = {hess_est_method_1};
+        semilogy(abs(evalSequentialStruct_DoublePendulum_regularization.cost(2:end)-evalSequentialStruct_DoublePendulum_regularization.cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
+        if enable_second_sequential
+            semilogy(abs(evalSequentialStruct_DoublePendulum_hessApprox2.cost(2:end)-evalSequentialStruct_DoublePendulum_hessApprox2.cost(1:end-1)),'LineWidth',1.2), hold on,
+            hessLegendNames{end+1} = hess_est_method_2;
+        end
+        semilogy(abs(solStruct_CD_DoublePendulum.stats.cost(2:end)-solStruct_CD_DoublePendulum.stats.cost(1:end-1)),'LineWidth',1.2), hold on,
+        xlabel('Iterations')
+        ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
+        hessLegendNames{end+1} = 'Coordinate-descent';
+        legend(hessLegendNames)
+
+        % constraint violation of sequential SOS
+        % ------------------------------------------------------------------------
+        % Note: If we are in the SOS cone, constraint violation is negative if
+        % signed distance is used. In that case, constraint violation is set to
+        % zero. For plotting on logarithmic scale zero values are set to eps!
+        % ------------------------------------------------------------------------
+        nexttile, semilogy(evalSequentialStruct_DoublePendulum_regularization.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on
+        plot([0 solStruct_seq_DoublePendulum_regularization.stats.iterations],[solStruct_seq_DoublePendulum_regularization.stats.options.tolerance_con solStruct_seq_DoublePendulum_regularization.stats.options.tolerance_con],'k--','LineWidth',1.2)
+        if enable_second_sequential
+            semilogy(evalSequentialStruct_DoublePendulum_hessApprox2.maxConVio,'LineWidth',1.2), hold on
+            plot([0 solStruct_seq_DoublePendulum_hessApprox2.stats.iterations],[solStruct_seq_DoublePendulum_hessApprox2.stats.options.tolerance_con solStruct_seq_DoublePendulum_hessApprox2.stats.options.tolerance_con],'k--','LineWidth',1.2)
+        end
+        plot([0 solStruct_seq_DoublePendulum_regularization.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
+        xlabel('Iterations')
+        ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
+        legend([hessLegendNames(1:end-1), {'$\epsilon_\mathrm{con}$','eps'}])
+    end
+end
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
 
 %% Aircraft 4D
 
 
-% generate problem structure (dynamics, polynomial dec. variables)
+% define the problem instances based on different polynomial degrees
 degV = {2,2:4,1:4};
 degS = {2:4,2:4,2:4};
 
 for kk = 1:numel(degV)
 
-% generate problem structure (dynamics, polynomial dec. variables)
-probStruct_Aircraft = generateAircraft_benchmark(degV{kk},degS{kk});
-fprintf('-------------------------------------------------- \n')
-fprintf('Run 2 - Region-of-Attraction for %s. \n',probStruct_Aircraft.Name)
-fprintf('-------------------------------------------------- \n')
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_Aircraft = generateAircraft_probStruct(degV{kk},degS{kk});
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_Aircraft.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
 
-% generate an initial guess
-x0 = generate_initGuess_Aircraft(probStruct_Aircraft);
+    % generate an initial guess
+    x0 = generate_initGuess_Aircraft(probStruct_Aircraft);
 
-% solve Aircraft example with two states using sequential SOS
-solStruct_seq_Aircraft     = solve_ROA_seq_bench_fun(probStruct_Aircraft,commonOpts,x0);
+    % solve Aircraft example with two states using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_Aircraft_regularization = solve_ROA_seq_bench_fun(probStruct_Aircraft,commonOpts,x0,hess_est_method);
 
-seqSolverStructs{end+1} = solStruct_seq_Aircraft;
+    seqSolverStructs_regularization{end+1} = solStruct_seq_Aircraft_regularization;
 
-% extract size and timing statistic from sequential
-evalSequentialStruct_Aircraft = evalSequential(solStruct_seq_Aircraft);
+    % extract size and timing statistic from sequential
+    evalSequentialStruct_Aircraft_regularization = evalSequential(solStruct_seq_Aircraft_regularization);
 
-% solve Aircraft example with two states using custom coordinate-descent
-solStruct_CD_Aircraft = solve_ROA_CD_bench_fun(probStruct_Aircraft,commonOpts,x0);
+    if enable_second_sequential
 
-cdSolverStructs{end+1} = solStruct_CD_Aircraft;
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_Aircraft_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_Aircraft,commonOpts,x0,hess_est_method);
 
-% Evaluate
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Aircraft_hessApprox2;
 
-% Plot convergence diagnostics
-figure('Name','Aircraft Benchmark')
-tiledlayout(1,2)
-nexttile
-semilogy(abs(evalSequentialStruct_Aircraft.cost(2:end)-evalSequentialStruct_Aircraft.cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
-semilogy(abs(solStruct_CD_Aircraft.stats.cost(2:end)-solStruct_CD_Aircraft.stats.cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
-xlabel('Iterations')
-ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
-legend('Sequential','Coordinate-descent')
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_Aircraft_hessApprox2 = evalSequential(solStruct_seq_Aircraft_hessApprox2);
+    end
 
-% constraint violation of sequential SOS
-% ------------------------------------------------------------------------
-% Note: If we are in the SOS cone, constraint violation is negative if
-% signed distance is used. In that case, constraint violation is set to
-% zero. For plotting on logarithmic scale zero values are set to eps!
-% ------------------------------------------------------------------------
-nexttile, semilogy(evalSequentialStruct_Aircraft.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on 
-plot([0 solStruct_seq_Aircraft.stats.iterations],[solStruct_seq_Aircraft.stats.options.tolerance_con solStruct_seq_Aircraft.stats.options.tolerance_con],'k--','LineWidth',1.2)
-plot([0 solStruct_seq_Aircraft.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
-xlabel('Iterations')
-ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
-legend('$ \theta(\xi_{k})$','$\epsilon_\mathrm{con}$','eps')
+    % solve Aircraft example with two states using custom coordinate-descent
+    solStruct_CD_Aircraft = solve_ROA_CD_bench_fun(probStruct_Aircraft,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_Aircraft;
+
+    %% Generate table
+
+    % append the current run to the accumulating results table
+    tableRows = appendResultRow(tableRows,probStruct_Aircraft,solStruct_CD_Aircraft,solStruct_seq_Aircraft_regularization);
+
+    if enable_plot_convergence
+        % Evaluate
+
+        % Plot convergence diagnostics
+        figure('Name','Aircraft Benchmark')
+        tiledlayout(1,2)
+        nexttile
+        hessLegendNames = {hess_est_method_1};
+        semilogy(abs(evalSequentialStruct_Aircraft_regularization.cost(2:end)-evalSequentialStruct_Aircraft_regularization.cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
+        if enable_second_sequential
+            semilogy(abs(evalSequentialStruct_Aircraft_hessApprox2.cost(2:end)-evalSequentialStruct_Aircraft_hessApprox2.cost(1:end-1)),'LineWidth',1.2), hold on,
+            hessLegendNames{end+1} = hess_est_method_2;
+        end
+        semilogy(abs(solStruct_CD_Aircraft.stats.cost(2:end)-solStruct_CD_Aircraft.stats.cost(1:end-1)),'LineWidth',1.2), hold on,
+        xlabel('Iterations')
+        ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
+        hessLegendNames{end+1} = 'Coordinate-descent';
+        legend(hessLegendNames)
+
+        % constraint violation of sequential SOS
+        % ------------------------------------------------------------------------
+        % Note: If we are in the SOS cone, constraint violation is negative if
+        % signed distance is used. In that case, constraint violation is set to
+        % zero. For plotting on logarithmic scale zero values are set to eps!
+        % ------------------------------------------------------------------------
+        nexttile, semilogy(evalSequentialStruct_Aircraft_regularization.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on
+        plot([0 solStruct_seq_Aircraft_regularization.stats.iterations],[solStruct_seq_Aircraft_regularization.stats.options.tolerance_con solStruct_seq_Aircraft_regularization.stats.options.tolerance_con],'k--','LineWidth',1.2)
+        if enable_second_sequential
+            semilogy(evalSequentialStruct_Aircraft_hessApprox2.maxConVio,'LineWidth',1.2), hold on
+            plot([0 solStruct_seq_Aircraft_hessApprox2.stats.iterations],[solStruct_seq_Aircraft_hessApprox2.stats.options.tolerance_con solStruct_seq_Aircraft_hessApprox2.stats.options.tolerance_con],'k--','LineWidth',1.2)
+        end
+        plot([0 solStruct_seq_Aircraft_regularization.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
+        xlabel('Iterations')
+        ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
+        legend([hessLegendNames(1:end-1), {'$\epsilon_\mathrm{con}$','eps'}])
+    end
 
 end
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 %% F/A-18
 
+% define the problem instances based on different polynomial degrees
 degV = {2, 2:4, 2:4};
 degS = {2,   2, 2:4};
 
-
 for kk = 1:numel(degV)
-% generate problem structure (dynamics, polynomial dec. variables)
-probStruct_F18 = generateF18_benchmark(degV{kk},degS{kk});
 
-fprintf('-------------------------------------------------- \n')
-fprintf('Run 3 - Region-of-Attraction for %s. \n',probStruct_F18.Name)
-fprintf('-------------------------------------------------- \n')
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_F18 = generateF18_probStruct(degV{kk},degS{kk});
 
-% generate an initial guess
-x0 = generate_initGuess_F18(probStruct_F18);
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_F18.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
 
-% solve F-18 example with seven states using sequential SOS
-solStruct_seq_7D     = solve_ROA_seq_bench_fun(probStruct_F18,commonOpts,x0);
+    % generate an initial guess
+    x0 = generate_initGuess_F18(probStruct_F18);
 
-seqSolverStructs{end+1} = solStruct_seq_7D;
+    % solve F-18 example with seven states using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_7D_regularization = solve_ROA_seq_bench_fun(probStruct_F18,commonOpts,x0,hess_est_method);
 
-% extract size and timing statistic from sequential
-evalSequentialStruct_7D = evalSequential(solStruct_seq_7D);
+    % store in a common struct for all sequential instances and problem
+    seqSolverStructs_regularization{end+1} = solStruct_seq_7D_regularization;
 
-% solve F-18 example with seven states using custom coordinate-descent
-solStruct_CD_7D = solve_ROA_CD_bench_fun(probStruct_F18,commonOpts,x0);
+    % extract size and timing statistic from sequential
+    evalSequentialStruct_7D_regularization = evalSequential(solStruct_seq_7D_regularization);
 
-cdSolverStructs{end+1} = solStruct_CD_7D;
+    if enable_second_sequential
 
-% Plot convergence diagnostics
-figure('Name','12State Benchmark')
-tiledlayout(1,2)
-nexttile
-semilogy(abs((evalSequentialStruct_7D.cost(2:end)-evalSequentialStruct_7D.cost(1:end-1))),'LineWidth',1.2), grid on, title('Cost'), hold on,
-semilogy(abs(solStruct_CD_7D.stats.cost(2:end)-solStruct_CD_7D.stats.cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
-xlabel('Iterations')
-ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
-legend('Sequential','Coordinate-descent')
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_7D_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_F18,commonOpts,x0,hess_est_method);
 
-% constraint violation of sequential SOS
-% ------------------------------------------------------------------------
-% Note: If we are in the SOS cone, constraint violation is negative if
-% signed distance is used. In that case, constraint violation is set to
-% zero. For plotting on logarithmic scale zero values are set to eps!
-% ------------------------------------------------------------------------
-nexttile, semilogy(0:1:solStruct_seq_7D.stats.iterations, evalSequentialStruct_7D.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on 
-plot([0 solStruct_seq_7D.stats.iterations],[solStruct_seq_7D.stats.options.tolerance_con solStruct_seq_7D.stats.options.tolerance_con],'k--','LineWidth',1.2)
-plot([0 solStruct_seq_7D.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
-xlabel('Iterations')
-ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
-legend('$ \theta(\xi_{k})$','$\epsilon_\mathrm{con}$','eps')
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_7D_hessApprox2;
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_7D_hessApprox2 = evalSequential(solStruct_seq_7D_hessApprox2);
+    end
+
+    % solve F-18 example with seven states using custom coordinate-descent
+    solStruct_CD_7D = solve_ROA_CD_bench_fun(probStruct_F18,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_7D;
+
+    %% Generate table
+
+    % append the current run to the accumulating results table
+    tableRows = appendResultRow(tableRows,probStruct_F18,solStruct_CD_7D,solStruct_seq_7D_regularization);
+
+
+    if enable_plot_convergence
+        % Plot convergence diagnostics
+        figure('Name','12State Benchmark')
+        tiledlayout(1,2)
+        nexttile
+        hessLegendNames = {hess_est_method_1};
+        semilogy(abs((evalSequentialStruct_7D_regularization.cost(2:end)-evalSequentialStruct_7D_regularization.cost(1:end-1))),'LineWidth',1.2), grid on, title('Cost'), hold on,
+        if enable_second_sequential
+            semilogy(abs((evalSequentialStruct_7D_hessApprox2.cost(2:end)-evalSequentialStruct_7D_hessApprox2.cost(1:end-1))),'LineWidth',1.2), hold on,
+            hessLegendNames{end+1} = hess_est_method_2;
+        end
+        semilogy(abs(solStruct_CD_7D.stats.cost(2:end)-solStruct_CD_7D.stats.cost(1:end-1)),'LineWidth',1.2), hold on,
+        xlabel('Iterations')
+        ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
+        hessLegendNames{end+1} = 'Coordinate-descent';
+        legend(hessLegendNames)
+
+        % constraint violation of sequential SOS
+        % ------------------------------------------------------------------------
+        % Note: If we are in the SOS cone, constraint violation is negative if
+        % signed distance is used. In that case, constraint violation is set to
+        % zero. For plotting on logarithmic scale zero values are set to eps!
+        % ------------------------------------------------------------------------
+        nexttile, semilogy(0:1:solStruct_seq_7D_regularization.stats.iterations, evalSequentialStruct_7D_regularization.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on
+        plot([0 solStruct_seq_7D_regularization.stats.iterations],[solStruct_seq_7D_regularization.stats.options.tolerance_con solStruct_seq_7D_regularization.stats.options.tolerance_con],'k--','LineWidth',1.2)
+        if enable_second_sequential
+            semilogy(0:1:solStruct_seq_7D_hessApprox2.stats.iterations, evalSequentialStruct_7D_hessApprox2.maxConVio,'LineWidth',1.2), hold on
+            plot([0 solStruct_seq_7D_hessApprox2.stats.iterations],[solStruct_seq_7D_hessApprox2.stats.options.tolerance_con solStruct_seq_7D_hessApprox2.stats.options.tolerance_con],'k--','LineWidth',1.2)
+        end
+        plot([0 solStruct_seq_7D_regularization.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
+        xlabel('Iterations')
+        ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
+        legend([hessLegendNames(1:end-1), {'$\epsilon_\mathrm{con}$','eps'}])
+    end
 
 end
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 %% 12-State Dynamical System
 
 % generate problem structure (dynamics, polynomial dec. variables)
-probStruct_12State= generate12State_benchmark();
-fprintf('-------------------------------------------------- \n')
-fprintf('Run 4 - Region-of-Attraction for %s. \n',probStruct_12State.Name)
-fprintf('-------------------------------------------------- \n')
+probStruct_12State= generate12State_probStruct();
+fprintf('------------------------------------------------------------------------------------------ \n')
+fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_12State.Name, 1, 1)
+fprintf('------------------------------------------------------------------------------------------\n')
 
 % generate an initial guess
 x0 = generate_initGuess_12State(probStruct_12State);
 
 % solve 12 state dynamical system example with 12 states using sequential SOS
-solStruct_seq_12D     = solve_ROA_seq_bench_fun(probStruct_12State,commonOpts,x0);
+hess_est_method = hess_est_method_1;
+solStruct_seq_12D_regularization = solve_ROA_seq_bench_fun(probStruct_12State,commonOpts,x0,hess_est_method);
 
-seqSolverStructs{end+1} = solStruct_seq_12D;
+seqSolverStructs_regularization{end+1} = solStruct_seq_12D_regularization;
 
 % extract size and timing statistic from sequential
-evalSequentialStruct_12D = evalSequential(solStruct_seq_12D);
+evalSequentialStruct_12D_regularization = evalSequential(solStruct_seq_12D_regularization);
+
+if enable_second_sequential
+
+    hess_est_method = hess_est_method_2;
+    solStruct_seq_12D_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_12State,commonOpts,x0,hess_est_method);
+
+    seqSolverStructs_hessApprox2{end+1} = solStruct_seq_12D_hessApprox2;
+
+    % extract size and timing statistic from sequential
+    evalSequentialStruct_12D_hessApprox2 = evalSequential(solStruct_seq_12D_hessApprox2);
+end
 
 % solve 12 state dynamical system example with 12 states using custom coordinate-descent
 solStruct_CD_12D = solve_ROA_CD_bench_fun(probStruct_12State,commonOpts,x0);
 
 cdSolverStructs{end+1} = solStruct_CD_12D;
 
+%% Generate table
 
-% Plot convergence diagnostics
-figure('Name','12StateBenchmark')
-tiledlayout(1,2)
-nexttile
-semilogy(abs((evalSequentialStruct_12D.cost(2:end)-evalSequentialStruct_12D.cost(1:end-1))),'LineWidth',1.2), grid on, title('Cost'), hold on,
-semilogy(abs(solStruct_CD_12D.stats.cost(2:end)-solStruct_CD_12D.stats.cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
-xlabel('Iterations')
-ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
-legend('Sequential','Coordinate-descent')
+% append the current run to the accumulating results table
+tableRows = appendResultRow(tableRows,probStruct_12State,solStruct_CD_12D,solStruct_seq_12D_regularization);
 
-% constraint violation of sequential SOS
-% ------------------------------------------------------------------------
-% Note: If we are in the SOS cone, constraint violation is negative if
-% signed distance is used. In that case, constraint violation is set to
-% zero. For plotting on logarithmic scale zero values are set to eps!
-% ------------------------------------------------------------------------
-nexttile, semilogy(0:1:solStruct_seq_12D.stats.iterations, evalSequentialStruct_12D.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on 
-plot([0 solStruct_seq_12D.stats.iterations],[solStruct_seq_12D.stats.options.tolerance_con solStruct_seq_12D.stats.options.tolerance_con],'k--','LineWidth',1.2)
-plot([0 solStruct_seq_12D.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
-xlabel('Iterations')
-ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
-legend('$ \theta(\xi_{k})$','$\epsilon_\mathrm{con}$','eps')
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
+
+if enable_plot_convergence
+    % Plot convergence diagnostics
+    figure('Name','12StateBenchmark')
+    tiledlayout(1,2)
+    nexttile
+    hessLegendNames = {hess_est_method_1};
+    semilogy(abs((evalSequentialStruct_12D_regularization.cost(2:end)-evalSequentialStruct_12D_regularization.cost(1:end-1))),'LineWidth',1.2), grid on, title('Cost'), hold on,
+    if enable_second_sequential
+        semilogy(abs((evalSequentialStruct_12D_hessApprox2.cost(2:end)-evalSequentialStruct_12D_hessApprox2.cost(1:end-1))),'LineWidth',1.2), hold on,
+        hessLegendNames{end+1} = hess_est_method_2;
+    end
+    semilogy(abs(solStruct_CD_12D.stats.cost(2:end)-solStruct_CD_12D.stats.cost(1:end-1)),'LineWidth',1.2), hold on,
+    xlabel('Iterations')
+    ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
+    hessLegendNames{end+1} = 'Coordinate-descent';
+    legend(hessLegendNames)
+
+    % constraint violation of sequential SOS
+    % ------------------------------------------------------------------------
+    % Note: If we are in the SOS cone, constraint violation is negative if
+    % signed distance is used. In that case, constraint violation is set to
+    % zero. For plotting on logarithmic scale zero values are set to eps!
+    % ------------------------------------------------------------------------
+    nexttile, semilogy(0:1:solStruct_seq_12D_regularization.stats.iterations, evalSequentialStruct_12D_regularization.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on
+    plot([0 solStruct_seq_12D_regularization.stats.iterations],[solStruct_seq_12D_regularization.stats.options.tolerance_con solStruct_seq_12D_regularization.stats.options.tolerance_con],'k--','LineWidth',1.2)
+    if enable_second_sequential
+        semilogy(0:1:solStruct_seq_12D_hessApprox2.stats.iterations, evalSequentialStruct_12D_hessApprox2.maxConVio,'LineWidth',1.2), hold on
+        plot([0 solStruct_seq_12D_hessApprox2.stats.iterations],[solStruct_seq_12D_hessApprox2.stats.options.tolerance_con solStruct_seq_12D_hessApprox2.stats.options.tolerance_con],'k--','LineWidth',1.2)
+    end
+    plot([0 solStruct_seq_12D_regularization.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
+    xlabel('Iterations')
+    ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
+    legend([hessLegendNames(1:end-1), {'$\epsilon_\mathrm{con}$','eps'}])
+end
+
+
+%% Results table (all benchmarks, all runs)
+
+% final results table accumulated over all runs and all problems
+resultsTable = cell2table(tableRows,'VariableNames',tableVariableNames);
+disp(resultsTable)
 
 
 %% Performance Profile (Dolan & More, Math. Program. 91, 2002)
 
-% number of problems n_p: one stored run per cell entry
-n_p = numel(seqSolverStructs);
+% sequential runs stored per Hessian estimation method (cf. hess_est_method)
+seqMethodStructs = {seqSolverStructs_regularization};
+seqMethodNames   = {hess_est_method_1};
+if enable_second_sequential
+    seqMethodStructs{end+1} = seqSolverStructs_hessApprox2;
+    seqMethodNames{end+1}   = hess_est_method_2;
+end
 
-% number of solvers n_s: sequential and coordinate descent
-n_s = 2;
+% solver names: one sequential solver per Hessian estimation method plus coordinate descent
+% (explicit loop: arrayfun/concat can produce nested cells, which fprintf rejects)
+solverNames = cell(1, numel(seqMethodNames) + 1);
+for s = 1:numel(seqMethodNames)
+    solverNames{s} = ['Sequential (' seqMethodNames{s} ')'];
+end
+solverNames{end} = 'Coordinate-descent';
+
+% number of problems n_p: one stored run per cell entry
+n_p = numel(cdSolverStructs);
+
+% number of solvers n_s: one sequential solver per Hessian estimation method and coordinate descent
+n_s = numel(solverNames);
 
 % computing time t_{p,s}: one row per problem p in P, one column per solver s in S
 % extract each run from the cell arrays of stored solver structs
 t_ps = zeros(n_p, n_s);
 for p = 1:n_p
-    % sequential run of problem p
-    solStruct_seq = seqSolverStructs{p};
+    % sequential runs of problem p, one per Hessian estimation method
+    for s = 1:numel(seqMethodStructs)
+        solStruct_seq = seqMethodStructs{s}{p};
+        t_ps(p, s) = solStruct_seq.stats.total_solve_time;
+    end
     % coordinate-descent run of problem p
     solStruct_cd  = cdSolverStructs{p};
-    % store the computing times t_{p,s} of both solvers
-    t_ps(p, :) = [solStruct_seq.stats.total_solve_time, solStruct_cd.stats.totalSolveTime];
+    % store the computing times t_{p,s} of all solvers
+    t_ps(p, n_s) = solStruct_cd.stats.totalSolveTime;
 end
 
 % logical matrix: solved_ps(p,s) = true iff solver s solves problem p
 % a run only counts as solved for the return status 'SOLVER_RET_SUCCESS'
 solved_ps = false(n_p, n_s);
 for p = 1:n_p
-    % sequential run of problem p
-    solStruct_seq = seqSolverStructs{p};
+    % sequential runs of problem p, one per Hessian estimation method
+    for s = 1:numel(seqMethodStructs)
+        solStruct_seq = seqMethodStructs{s}{p};
+        solved_ps(p, s) = strcmp(solStruct_seq.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS');
+    end
     % coordinate-descent run of problem p
     solStruct_cd  = cdSolverStructs{p};
-    % solved_ps(p,1): sequential, solved_ps(p,2): coordinate descent
-    solved_ps(p, 1) = strcmp(solStruct_seq.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS');
-    solved_ps(p, 2) = strcmp(solStruct_cd.stats.UNIFIED_RETURN_STATUS,  'SOLVER_RET_SUCCESS');
+    % solved_ps(p,n_s): coordinate descent
+    solved_ps(p, n_s) = strcmp(solStruct_cd.stats.UNIFIED_RETURN_STATUS,  'SOLVER_RET_SUCCESS');
 end
 
 % drop problems that no solver could solve (cf. drop_unsolvable! in
@@ -294,8 +670,7 @@ solved_ps(~keep_p, :) = [];
 % number of problems n_p remaining in the test set
 n_p = size(t_ps, 1);
 
-% solver names and colors for reporting and plotting (cf. get_style)
-solverNames  = {'Sequential', 'Coordinate-descent'};
+% solver colors for reporting and plotting (cf. get_style)
 solverColors = lines(n_s);
 
 % Shifted geometric means (cf. shifted_geometric_means in ClarabelBenchmarks)
@@ -368,8 +743,9 @@ tiledlayout(1,2)
 
 % (a) relative performance profile
 ax_r = nexttile;
-semilogx(ax_r, tau, f_s_r(:, 1), 'LineWidth', 2, 'Color', solverColors(1, :)), hold(ax_r, 'on')
-semilogx(ax_r, tau, f_s_r(:, 2), 'LineWidth', 2, 'Color', solverColors(2, :))
+for s = 1:n_s
+    semilogx(ax_r, tau, f_s_r(:, s), 'LineWidth', 2, 'Color', solverColors(s, :)), hold(ax_r, 'on')
+end
 grid(ax_r, 'on'), grid(ax_r, 'minor')
 xlim(ax_r, [1, 100]), ylim(ax_r, [0, 1])
 xticks(ax_r, [1, 10, 100])
@@ -393,17 +769,3 @@ ylabel(ax_a, 'fraction of problems solved within $t$')
 title(ax_a, 'Solution time profile')
 legend(ax_a, solverNames, 'Location', 'southeast')
 
-%% ------------------------------------------------------------------------
-%  local functions
-% ------------------------------------------------------------------------
-
-% relative performance profile: fraction of problems per solver column
-% whose ratio lies below each grid level,
-% f_sx(k, s) = #{ p in P : data(p, s) < x_grid(k) } / n_p
-% (strict comparison, as in ClarabelBenchmarks/src/performance_profile.jl;
-%  Inf entries of failed solves never count)
-function f_sx = perf_profile_cdf(data, x_grid)
-    % logical 3-D array with entry (p, s, k) = (data(p, s) < x_grid(k)),
-    % vectorized over all solvers via implicit expansion
-    f_sx = squeeze(sum(data < reshape(x_grid, 1, 1, []), 1) / size(data, 1)).';
-end

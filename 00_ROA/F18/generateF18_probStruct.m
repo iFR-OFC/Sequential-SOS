@@ -17,22 +17,24 @@
 %   License: GNU GENERAL PUBLIC LICENSE Version 3
 %--------------------------------------------------------------------------
 
-function [probStruct] = generate12State_benchmark()
+function [probStruct] = generateF18_probStruct(degV,degS)
 
-x = casos.Indeterminates('x',12,1);
+x = casos.Indeterminates('x',7,1);
 
-import casos.toolboxes.sosopt.cleanpoly
+f = f18Dynamics(x);
 
+d2r = pi/180;
 
-f = gen12StateDynamics(x);
-
-g = x'*eye(12)*0.1*x-1;
+% generate a desired safe set
+Dmax = diag([10*d2r 25*d2r 35*d2r 30*d2r 15*d2r 25*d2r 20*d2r]);  
+N = inv(Dmax^2);   %  Scale by inverse of max state values
+g = x'*N*0.1*x-1;
 
 % Lyapunov function candidate
-V = casos.PS.sym('v',monomials(x,2));
+V = casos.PS.sym('v',monomials(x,degV));
 
 % SOS multiplier
-s1    = casos.PS.sym('s1',monomials(x,2));
+s1    = casos.PS.sym('s1',monomials(x,degS));
 
 
 % fill structure
@@ -41,8 +43,8 @@ probStruct.f    = f;        % dynamics
 probStruct.g    = g;        % safe set
 probStruct.s1   = s1;       % multiplier
 probStruct.V    = V;        % Lyapunov function
-probStruct.b    = 0.1;        % constant stable level set
-probStruct.Name = '12 State Dynamical System'; % Name of example
+probStruct.b    = 1;        % constant stable level set
+probStruct.Name = 'F/A-18'; % Name of example
 
 end
 

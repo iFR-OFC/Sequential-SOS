@@ -1,5 +1,5 @@
 
-function [probStruct] = generateVDP_benchmark(degV,degS)
+function [probStruct] = generateVDP_probStruct(degV,degS)
 
 x = casos.Indeterminates('x',2,1);
 

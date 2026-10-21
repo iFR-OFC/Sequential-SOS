@@ -18,9 +18,6 @@ l = 1e-6*(x'*x);
 buildTimes_start = tic;
 
 
-b= casos.PS.sym('b');
-
-
 %% setup solver
 
 % solver 1: s1-step
@@ -34,6 +31,7 @@ opts.Kx = struct('lin', 1);
 opts.Kc = struct('sos', 2);
 opts.newton_solver =[];
 opts.error_on_fail = 0;
+
 % build first solver
 S1 = casos.sossol('S1','mosek',sos1,opts);
 
@@ -93,8 +91,8 @@ for iter = 1:maxIter
                 
                 s1val = x0(2);
 
-                fprintf('Infeasible in solver 1 in iteration %d. We provide aanother guess. \n',iter)
-                UNIFIED_RETURN_STATUS = S1.stats.UNIFIED_RETURN_STATUS;
+                fprintf('Infeasible in solver 1 in iteration %d. We provide another initial guess. \n',iter)
+              
             else
                 fprintf('Infeasible in solver 1 in iteration %d; retaining previous iterate\n', iter);
                 UNIFIED_RETURN_STATUS = old_UNIFIED_RETURN_STATUS1;

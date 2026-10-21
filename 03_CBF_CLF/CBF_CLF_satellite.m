@@ -119,6 +119,8 @@ opts = struct('sossol','mosek');
 
 opts.verbose       = 1;
 opts.max_iter      = 100;
+opts.tolerance_con = 1e-5;
+opts.tolerance_opt = 1e-1;
 
 % fixed constant for comparison functions
 gammaV = 0.0025;
@@ -179,8 +181,13 @@ Ksol_re = subs(K,x,Dx*x);
 
 
 S.info.sossol_convex.gram.Kc
+%%
+extractor = extractorClass(sos.x, sol.x);  
 
-
+W_sol  = extractor.getSol(W);      % solved CBF polynomial (degree-2)
+V_sol  = extractor.getSol(V);      % solved CLF polynomial
+Kd_sol = extractor.getSol(Kd);     % solved 3x1 gain vector, shape preserved
+s1_sol = extractor.getSol(s1);
 
 %% Eval
 cost      = nan(S.stats.iterations,1);
@@ -206,27 +213,26 @@ nexttile, semilogy(abs(cost(2:end)-cost(1:end-1)),'LineWidth',1.2), grid on, tit
       plot([0 S.stats.iterations],[S.stats.options.tolerance_opt S.stats.options.tolerance_opt],'k--','LineWidth',1.2)    
 nexttile, semilogy(maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on 
 plot([0 S.stats.iterations],[S.stats.options.tolerance_con S.stats.options.tolerance_con],'k--','LineWidth',1.2)
-% nexttile, plot(alpha,'LineWidth',1.2), grid on, title('Step length')
-% nexttile, plot(counterSoC,'LineWidth',1.2), grid on, title('SoC iterations')
 
-% %% plotting
-% import casos.toolboxes.sosopt.*
-% 
-% % slice for rates
-% figure(1)
-% deg2rad = diag([pi/180,pi/180,pi/180 1 1 1]);
-% clf
-% pcontour(subs(subs(Wsol_re,x(3:end),zeros(4,1)),x,deg2rad*x),0,[-omegaMax1 omegaMax1 -omegaMax1 omegaMax1]*180/pi,'g')
-% hold on 
-% pcontour(subs(subs(g0,x(3:end),zeros(4,1)),x,deg2rad*x),0,[-omegaMax1 omegaMax1 -omegaMax1 omegaMax1]*180/pi,'k--')
-% legend('Terminal Set','Safe Set')
-% 
-% % 3D slice for Modified rodrigues parameter
-% figure(2)
-% deg2rad = diag([pi/180,pi/180,pi/180 1 1 1]);
-% clf
-% pcontour3(subs(Wsol_re,x(1:3),zeros(3,1)),0,[-1 1 -1 1 -1 1])
-% hold on 
-% legend('Terminal Set')
-% 
+%%
+% check if  solution is really SOS
 
+sos_conv = struct('g',sol.g);
+
+% constraint is scalar SOS cone
+opts_conv = struct('Kc',struct('sos',19));
+
+% turn off error on fail, otherwise it throws an error if infeasible
+% we want to manually check it below
+opts.error_on_fail = 0;
+
+% solve by relaxation to SDP
+S_conv = casos.sossol('S','mosek',sos_conv,opts_conv);
+% evaluate
+sol_conv = S_conv();
+
+if strcmp(S_conv.stats.UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS')
+    disp('Given polynomial is SOS!')
+else
+    disp('No decomposition found!')
+end

@@ -1,5 +1,5 @@
 
-function [solStruct] = solve_ROA_seq_bench_fun(probStruct,commonOpts,x0)
+function [solStruct] = solve_ROA_seq_bench_fun(probStruct,commonOpts,x0,hess_est_method)
 
 
 
@@ -15,8 +15,8 @@ b  = probStruct.b;
 % options
 opts                              = struct('sossol','mosek');
 opts.max_iter                     = commonOpts.maxiter;
-opts.almost_opt_count             = 10;
 opts.sossol_options.newton_solver = [];
+opts.hessian_approx               = hess_est_method;
 
 
 % enforce positivity

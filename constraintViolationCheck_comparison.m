@@ -38,7 +38,7 @@ nxMax = 5;
 % Initialize arrays to store computation times for each method
 time_sos                = zeros(1, nxMax-1);   
 time_signed_distance    = zeros(1, nxMax-1);  
-time_polyopt            =  zeros(1, nxMax-1);
+time_polyopt            = zeros(1, nxMax-1);
 time_sampling_1000      = zeros(1, nxMax-1);   
 time_sampling_10000     = zeros(1, nxMax-1);  
 time_sampling_100000    = zeros(1, nxMax-1); 
