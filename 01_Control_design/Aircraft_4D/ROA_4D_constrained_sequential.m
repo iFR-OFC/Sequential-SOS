@@ -206,30 +206,14 @@ opts.Kc      = struct('sos', length(sos.g));
 opts.sossol_options.newton_solver =[];
 
 % setup solver
-profile on
+
 S = casos.nlsossol('S1','sequential',sos,opts);
-profile viewer
+
 %% solve problem
-
-% initial guess
-V0 = g;
-s20 = (x'*x)^2;
-s30 = [1;1];
-s40 = [1;1];
-s50 = x'*x;
-K0  = [1*x(1);1*x(3)];
-b0  = 1;
-
-x0 = casos.PD([V0;s20;s30;s40;s50;K0;b0]);
 
 % solve problem
 sol = S('x0' ,x0);
 
-% casos.postProcessSolver(S,true);
-
-S.stats
-
-S.stats.single_iterations{end}.conic
 
 %% plotting
 figure
