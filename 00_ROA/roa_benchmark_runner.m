@@ -46,7 +46,7 @@ enable_second_sequential = true;
 
 % Hessian estimation methods of the sequential solver to compare
 hess_est_method_1 = 'regularization'; % our default (see also sequentialCommon.m)
-hess_est_method_2 = 'BFGS';      % 'BFGS', 'levenberg', 'mirroring'
+hess_est_method_2 = 'BFGS';           % 'BFGS', 'levenberg', 'mirroring'
 
 % common options shared by the methods
 commonOpts.maxiter       = 350;
@@ -90,8 +90,12 @@ for kk = 1:numel(degV)
 
     seqSolverStructs_regularization{end+1} = solStruct_seq_VDP_regularization;
 
-    % extract size and timing statistic from sequential
-    evalSequentialStruct_VDP_regularization = evalSequential(solStruct_seq_VDP_regularization);
+    % extract size and timing statistic from sequential and add some meta
+    % data for plotting
+    evalSequentialStruct_VDP_regularization                 = evalSequential(solStruct_seq_VDP_regularization);
+    evalSequentialStruct_VDP_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_VDP_regularization.probNumber      = kk;
+    
 
     if enable_second_sequential
 
@@ -102,6 +106,8 @@ for kk = 1:numel(degV)
 
         % extract size and timing statistic from sequential
         evalSequentialStruct_VDP_hessApprox2 = evalSequential(solStruct_seq_VDP_hessApprox2);
+        evalSequentialStruct_VDP_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_VDP_hessApprox2.probNumber = kk;
     end
 
     % solve VDP example with two states using custom coordinate-descent
@@ -110,46 +116,16 @@ for kk = 1:numel(degV)
     cdSolverStructs{end+1} = solStruct_CD_VDP;
 
 
-    %% Generate table
-
     % append the current run to the accumulating results table
     tableRows = appendResultRow(tableRows,probStruct_VDP,solStruct_CD_VDP,solStruct_seq_VDP_regularization);
 
     if enable_plot_convergence
         % Evaluate
-
-        % Plot convergence diagnostics
-        figure('Name','VDP Benchmark')
-        tiledlayout(1,2)
-        nexttile
-        hessLegendNames = {hess_est_method_1};
-        semilogy(abs(evalSequentialStruct_VDP_regularization.cost(2:end)-evalSequentialStruct_VDP_regularization.cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
-        if enable_second_sequential
-            semilogy(abs(evalSequentialStruct_VDP_hessApprox2.cost(2:end)-evalSequentialStruct_VDP_hessApprox2.cost(1:end-1)),'LineWidth',1.2), hold on,
-            hessLegendNames{end+1} = hess_est_method_2;
-        end
-        semilogy(abs(solStruct_CD_VDP.stats.cost(2:end)-solStruct_CD_VDP.stats.cost(1:end-1)),'LineWidth',1.2), hold on,
-        xlabel('Iterations')
-        ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
-        hessLegendNames{end+1} = 'Coordinate-descent';
-        legend(hessLegendNames)
-
-        % constraint violation of sequential SOS
-        % ------------------------------------------------------------------------
-        % Note: If we are in the SOS cone, constraint violation is negative if
-        % signed distance is used. In that case, constraint violation is set to
-        % zero. For plotting on logarithmic scale zero values are set to eps!
-        % ------------------------------------------------------------------------
-        nexttile, semilogy(evalSequentialStruct_VDP_regularization.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on
-        plot([0 solStruct_seq_VDP_regularization.stats.iterations],[solStruct_seq_VDP_regularization.stats.options.tolerance_con solStruct_seq_VDP_regularization.stats.options.tolerance_con],'k--','LineWidth',1.2)
-        if enable_second_sequential
-            semilogy(evalSequentialStruct_VDP_hessApprox2.maxConVio,'LineWidth',1.2), hold on
-            plot([0 solStruct_seq_VDP_hessApprox2.stats.iterations],[solStruct_seq_VDP_hessApprox2.stats.options.tolerance_con solStruct_seq_VDP_hessApprox2.stats.options.tolerance_con],'k--','LineWidth',1.2)
-        end
-        plot([0 solStruct_seq_VDP_regularization.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
-        xlabel('Iterations')
-        ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
-        legend([hessLegendNames(1:end-1), {'$\epsilon_\mathrm{con}$','eps'}])
+        plotConvergence(probStruct_VDP, ...
+                        enable_second_sequential,...
+                        evalSequentialStruct_VDP_regularization,...
+                        evalSequentialStruct_VDP_hessApprox2,...
+                        solStruct_CD_VDP)
     end
 end
 
