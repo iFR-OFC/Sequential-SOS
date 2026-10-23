@@ -1,25 +1,24 @@
 
-function [probStruct] = generateDoublePendulum_probStruct(degV,degS)
+function [probStruct] = generateLotkaVol_probStruct(degV,degS)
 
-x = casos.Indeterminates('x',4,1);
-u = casos.Indeterminates('u',2,1);
+x = casos.Indeterminates('x',5,1);
 
-% generate closed-loop dynamics
-f = doublePendulumDynamics(x,u);
+f = dynamics_LotkaVolterra5(x);
 
 
-% generate a desired safe set as superellipsoid
-n = 2;
-g = (x(1)^2/1^2)^(n/2) + (x(2)^2/2^2)^(n/2) + (x(3)^2/1^2)^(n/2) + ...
-     (x(4)^2/2^2)^(n/2) - 1;
+% generate a desired safe set
 
+A_cl = subs(nabla(f,x),x,zeros(length(x),1));
+
+P = lyap(full(A_cl)',eye(length(x)));
+
+g = x'*P*x - 1;
 
 % Lyapunov function candidate
 V = casos.PS.sym('v',monomials(x,degV));
 
 % SOS multiplier
 s1    = casos.PS.sym('s1',monomials(x,degS));
-
 
 
 % fill structure
@@ -29,7 +28,8 @@ probStruct.g    = g;        % safe set
 probStruct.s1   = s1;       % multiplier
 probStruct.V    = V;        % Lyapunov function
 probStruct.b    = 1;        % constant stable level set
-probStruct.Name = 'Double-pendulum'; % Name of example
+
+probStruct.Name = 'Lotka-Voltera'; % Name of example
 
 end
 

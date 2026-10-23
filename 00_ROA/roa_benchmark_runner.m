@@ -6,8 +6,9 @@
 %  Benchmark 2: Multi-Input-Multi-Output
 %  Benchmark 3: Double Pendulum
 %  Benchmark 4: Aircraft
-%  Benchmark 5: F-18
-%  Benchmark 6: Network
+%  Benchmark 5: Satellite
+%  Benchmark 6: F-18
+%  Benchmark 7: Network
 %
 %  Note 1: Each runs uses various combinations of polynomial degrees. For SOS
 %  problem to be feasible or to improve solution quality higher degree are
@@ -33,11 +34,13 @@ clear
 clc
 
 % add the problem specific folders
-addpath("F18/")
 addpath("VDP/")
 addpath("MultiInput/")
 addpath("DoublePendulum/")
 addpath("Aircraft/")
+addpath("LotkaVoltera/")
+addpath("Satellite_Att/")
+addpath("F18/")
 addpath("Network/")
 
 % enable plotting of convergence for each run
@@ -55,13 +58,30 @@ commonOpts.maxSolveTime  = 3600;
 commonOpts.solver        = 'mosek';
 
 
-% initialize the cell array that accumulates one row per run of the results table
-tableRows = cell(0, 12);
-
 % variable names of the results table (one row per run)
 tableVariableNames = {'Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
     'Build Time (CD)','Build Time (SQ)','Solve Time (CD)','Solve Time (SQ)', ...
     'Iterations (CD)','Iterations (SQ)','Final Cost (CD)','Final Cost (SQ)'};
+
+% extend the results table by the sequential run with the second Hessian
+% estimation method (cf. enable_second_sequential)
+if enable_second_sequential
+    tableVariableNames = [tableVariableNames, ...
+        ['Build Time (SQ ' hess_est_method_2 ')'], ...
+        ['Solve Time (SQ ' hess_est_method_2 ')'], ...
+        ['Iterations (SQ ' hess_est_method_2 ')'], ...
+        ['Final Cost (SQ ' hess_est_method_2 ')']];
+end
+
+% initialize the cell array that accumulates one row per run of the
+% results table (one column per table variable)
+tableRows = cell(0, numel(tableVariableNames));
+
+
+% initialize the cell arrays of stored runs (one entry per run)
+seqSolverStructs_regularization = {};
+seqSolverStructs_hessApprox2    = {};
+cdSolverStructs                 = {};
 
 
 %% VDP
@@ -70,10 +90,6 @@ tableVariableNames = {'Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gra
 degV = {2,2:4,1:4,2:6};
 degS = {2,2,2:4,2:4};
 
-% initialize the cell arrays of stored runs (one entry per run)
-seqSolverStructs_regularization = {};
-seqSolverStructs_hessApprox2 = {};
-cdSolverStructs  = {};
 
 for kk = 1:numel(degV)
 
@@ -119,7 +135,13 @@ for kk = 1:numel(degV)
 
 
     % append the current run to the accumulating results table
-    tableRows = appendResultRow(tableRows,probStruct_VDP,solStruct_CD_VDP,solStruct_seq_VDP_regularization);
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows,probStruct_VDP,solStruct_CD_VDP, ...
+            solStruct_seq_VDP_regularization,solStruct_seq_VDP_hessApprox2);
+    else
+        tableRows = appendResultRow(tableRows,probStruct_VDP,solStruct_CD_VDP, ...
+                                    solStruct_seq_VDP_regularization);
+    end
 
     if enable_plot_convergence
         % Evaluate
@@ -185,7 +207,13 @@ for kk = 1:numel(degV)
     % Generate table
 
     % append the current run to the accumulating results table
-    tableRows = appendResultRow(tableRows,probStruct_MiMo,solStruct_CD_MiMo,solStruct_seq_MiMo_regularization);
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows,probStruct_MiMo,solStruct_CD_MiMo, ...
+            solStruct_seq_MiMo_regularization,solStruct_seq_MiMo_hessApprox2);
+    else
+        tableRows = appendResultRow(tableRows,probStruct_MiMo,solStruct_CD_MiMo, ...
+            solStruct_seq_MiMo_regularization);
+    end
 
     if enable_plot_convergence
         % Evaluate
@@ -248,10 +276,16 @@ for kk = 1:numel(degV)
 
     cdSolverStructs{end+1} = solStruct_CD_DoublePendulum;
 
-    %% Generate table
+    % Generate table
 
     % append the current run to the accumulating results table
-    tableRows = appendResultRow(tableRows,probStruct_DoublePendulum,solStruct_CD_DoublePendulum,solStruct_seq_DoublePendulum_regularization);
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows,probStruct_DoublePendulum,solStruct_CD_DoublePendulum, ...
+            solStruct_seq_DoublePendulum_regularization,solStruct_seq_DoublePendulum_hessApprox2);
+    else
+        tableRows = appendResultRow(tableRows,probStruct_DoublePendulum,solStruct_CD_DoublePendulum, ...
+            solStruct_seq_DoublePendulum_regularization);
+    end
 
 
     if enable_plot_convergence
@@ -315,10 +349,16 @@ for kk = 1:numel(degV)
 
     cdSolverStructs{end+1} = solStruct_CD_Aircraft;
 
-    %% Generate table
+    % Generate table
 
     % append the current run to the accumulating results table
-    tableRows = appendResultRow(tableRows,probStruct_Aircraft,solStruct_CD_Aircraft,solStruct_seq_Aircraft_regularization);
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows,probStruct_Aircraft,solStruct_CD_Aircraft, ...
+            solStruct_seq_Aircraft_regularization,solStruct_seq_Aircraft_hessApprox2);
+    else
+        tableRows = appendResultRow(tableRows,probStruct_Aircraft,solStruct_CD_Aircraft, ...
+            solStruct_seq_Aircraft_regularization);
+    end
 
     if enable_plot_convergence
         % Evaluate
@@ -333,6 +373,152 @@ end
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
+%% LotkaVol
+
+% define the problem instances based on different polynomial degrees
+degV = {2,2:4,1:4};
+degS = {2,2:4,2:4};
+
+for kk = 1:numel(degV)
+
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_LotkaVol = generateLotkaVol_probStruct(degV{kk},degS{kk});
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_LotkaVol.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
+
+    % generate an initial guess
+    x0 = generate_initGuess_LotkaVol(probStruct_LotkaVol);
+
+    % solve LotkaVol example with two states using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_LotkaVol_regularization = solve_ROA_seq_bench_fun(probStruct_LotkaVol,commonOpts,x0,hess_est_method);
+
+    seqSolverStructs_regularization{end+1} = solStruct_seq_LotkaVol_regularization;
+
+    % extract size and timing statistic from sequential
+    evalSequentialStruct_LotkaVol_regularization = evalSequential(solStruct_seq_LotkaVol_regularization);
+    evalSequentialStruct_LotkaVol_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_LotkaVol_regularization.probNumber = kk;
+
+    if enable_second_sequential
+
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_LotkaVol_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_LotkaVol,commonOpts,x0,hess_est_method);
+
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_LotkaVol_hessApprox2;
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_LotkaVol_hessApprox2 = evalSequential(solStruct_seq_LotkaVol_hessApprox2);
+        evalSequentialStruct_LotkaVol_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_LotkaVol_hessApprox2.probNumber = kk;
+    end
+
+    % solve LotkaVol example with two states using custom coordinate-descent
+    solStruct_CD_LotkaVol = solve_ROA_CD_bench_fun(probStruct_LotkaVol,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_LotkaVol;
+
+    % Generate table
+
+    % append the current run to the accumulating results table
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows,probStruct_LotkaVol,solStruct_CD_LotkaVol, ...
+            solStruct_seq_LotkaVol_regularization,solStruct_seq_LotkaVol_hessApprox2);
+    else
+        tableRows = appendResultRow(tableRows,probStruct_LotkaVol,solStruct_CD_LotkaVol, ...
+            solStruct_seq_LotkaVol_regularization);
+    end
+
+    if enable_plot_convergence
+        % Evaluate
+        plotConvergence(probStruct_LotkaVol, ...
+            enable_second_sequential,...
+            evalSequentialStruct_LotkaVol_regularization,...
+            evalSequentialStruct_LotkaVol_hessApprox2,...
+            solStruct_CD_LotkaVol)
+    end
+
+end
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
+
+%% Satellite
+
+% define the problem instances based on different polynomial degrees
+degV = {2,2:4,2:6};
+degS = {2,2,2:4};
+
+
+for kk = 1:numel(degV)
+
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_Satellite = generateSatellite_probStruct(degV{kk},degS{kk});
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_Satellite.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
+
+    % generate an initial guess
+    x0 = generate_initGuess_Satellite(probStruct_Satellite);
+
+    % solve Satellite example with two states using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_Satellite_regularization = solve_ROA_seq_bench_fun(probStruct_Satellite,commonOpts,x0,hess_est_method);
+
+    seqSolverStructs_regularization{end+1} = solStruct_seq_Satellite_regularization;
+
+    % extract size and timing statistic from sequential and add some meta
+    % data for plotting
+    evalSequentialStruct_Satellite_regularization                 = evalSequential(solStruct_seq_Satellite_regularization);
+    evalSequentialStruct_Satellite_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_Satellite_regularization.probNumber      = kk;
+
+
+    if enable_second_sequential
+
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_Satellite_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_Satellite,commonOpts,x0,hess_est_method);
+
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Satellite_hessApprox2;
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_Satellite_hessApprox2 = evalSequential(solStruct_seq_Satellite_hessApprox2);
+        evalSequentialStruct_Satellite_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_Satellite_hessApprox2.probNumber = kk;
+    end
+
+    % solve Satellite example with two states using custom coordinate-descent
+    solStruct_CD_Satellite = solve_ROA_CD_bench_fun(probStruct_Satellite,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_Satellite;
+
+
+    % append the current run to the accumulating results table
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows,probStruct_Satellite,solStruct_CD_Satellite, ...
+            solStruct_seq_Satellite_regularization,solStruct_seq_Satellite_hessApprox2);
+    else
+        tableRows = appendResultRow(tableRows,probStruct_Satellite,solStruct_CD_Satellite, ...
+            solStruct_seq_Satellite_regularization);
+    end
+
+    if enable_plot_convergence
+        % Evaluate
+        plotConvergence(probStruct_Satellite, ...
+            enable_second_sequential,...
+            evalSequentialStruct_Satellite_regularization,...
+            evalSequentialStruct_Satellite_hessApprox2,...
+            solStruct_CD_Satellite)
+    end
+end
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
+
 
 %% F/A-18
 
@@ -382,10 +568,16 @@ for kk = 1:numel(degV)
 
     cdSolverStructs{end+1} = solStruct_CD_7D;
 
-    %% Generate table
+    % Generate table
 
     % append the current run to the accumulating results table
-    tableRows = appendResultRow(tableRows,probStruct_F18,solStruct_CD_7D,solStruct_seq_7D_regularization);
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows,probStruct_F18,solStruct_CD_7D, ...
+            solStruct_seq_7D_regularization,solStruct_seq_7D_hessApprox2);
+    else
+        tableRows = appendResultRow(tableRows,probStruct_F18,solStruct_CD_7D, ...
+            solStruct_seq_7D_regularization);
+    end
 
 
     if enable_plot_convergence
@@ -442,10 +634,16 @@ solStruct_CD_12D = solve_ROA_CD_bench_fun(probStruct_12State,commonOpts,x0);
 
 cdSolverStructs{end+1} = solStruct_CD_12D;
 
-%% Generate table
+% Generate table
 
 % append the current run to the accumulating results table
-tableRows = appendResultRow(tableRows,probStruct_12State,solStruct_CD_12D,solStruct_seq_12D_regularization);
+if enable_second_sequential
+    tableRows = appendResultRow(tableRows,probStruct_12State,solStruct_CD_12D, ...
+        solStruct_seq_12D_regularization,solStruct_seq_12D_hessApprox2);
+else
+    tableRows = appendResultRow(tableRows,probStruct_12State,solStruct_CD_12D, ...
+        solStruct_seq_12D_regularization);
+end
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
@@ -526,6 +724,47 @@ end
 % ClarabelBenchmarks): all-solvers-failed runs must not distort the
 % profile denominators nor the shifted geometric means
 keep_p = any(solved_ps, 2);
+
+% additionally drop problems for which the solvers converged to
+% different local solutions (cf. Eq. (38) in Waechter & Biegler,
+% Math. Program. 106, 2004, p. 49): the final objective values of the
+% unsuccessful runs are omitted and the problem is discarded if
+% (f_*^max - f_*^min) / (1 + max(|f_*^min|, |f_*^max|)) > 1e-1
+keep_cost = true(n_p, 1);
+for p = 1:n_p
+    % problems already dropped above cannot enter the comparison
+    if ~keep_p(p)
+        continue
+    end
+    % final objective values f(x_*^s) of the successful runs of problem p
+    f_star = nan(n_s, 1);
+    % sequential runs of problem p, one per Hessian estimation method
+    for s = 1:numel(seqMethodStructs)
+        if solved_ps(p, s)
+            solStruct_seq = seqMethodStructs{s}{p};
+            f_star(s) = solStruct_seq.stats.single_iterations{end}.cost;
+        end
+    end
+    % coordinate-descent run of problem p
+    if solved_ps(p, n_s)
+        solStruct_cd = cdSolverStructs{p};
+        f_star(n_s) = solStruct_cd.stats.cost(end);
+    end
+    % f_*^max and f_*^min over the final objective values of the
+    % successful runs only (unsuccessful runs omitted)
+    f_star_max = max(f_star, [], 'omitnan');
+    f_star_min = min(f_star, [], 'omitnan');
+    % discard the problem if the final objective values are not close
+    if (f_star_max - f_star_min) / (1 + max(abs(f_star_min), abs(f_star_max))) > 1e-1
+        keep_cost(p) = false;
+    end
+end
+if any(keep_p & ~keep_cost)
+    fprintf('Cost exclusion (Eq. 38): discarded %d problem(s) with diverging final objective values\n', ...
+        sum(keep_p & ~keep_cost))
+end
+keep_p = keep_p & keep_cost;
+
 t_ps(~keep_p, :)      = [];
 solved_ps(~keep_p, :) = [];
 
@@ -534,8 +773,6 @@ n_p = size(t_ps, 1);
 
 % solver colors for reporting and plotting (cf. get_style)
 solverColors = lines(n_s);
-
-% Shifted geometric means (cf. shifted_geometric_means in ClarabelBenchmarks)
 
 % shift k of the shifted geometric mean
 k_shift = 1;
@@ -631,3 +868,13 @@ ylabel(ax_a, 'fraction of problems solved within $t$')
 title(ax_a, 'Solution time profile')
 legend(ax_a, solverNames, 'Location', 'southeast')
 
+
+% we are done, remove the problem specific folders from the path
+rmpath("VDP/")
+rmpath("MultiInput/")
+rmpath("DoublePendulum/")
+rmpath("Aircraft/")
+rmpath("LotkaVoltera/")
+rmpath("Satellite_Att/")
+rmpath("F18/")
+rmpath("Network/")

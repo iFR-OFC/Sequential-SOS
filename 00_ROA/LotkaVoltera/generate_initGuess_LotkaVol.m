@@ -1,4 +1,4 @@
-function x0 = generate_initGuess_DoublePendulum(probStruct)
+function x0 = generate_initGuess_LotkaVol(probStruct)
 
 f = probStruct.f;
 x = probStruct.x;

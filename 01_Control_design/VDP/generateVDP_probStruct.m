@@ -5,15 +5,15 @@ x = casos.Indeterminates('x',2,1);
 u = casos.Indeterminates('u',1,1);
 
 
-f = [-x(2); 
-      u*1 - x(1) + (x(1)^2 - 1)*x(2)];
+f = [x(2); 
+      (1-x(1)^2)*x(2) - x(1) + u ];
 
 
-umax = 1;
+umax =  1;
 umin = -1;
+
 % generate a desired safe set
-Q = eye(2)*0.1;
-g = x'*Q*x-1;
+g = x(1)^2 + 3*x(2)^2 - 1;
 
 % Lyapunov function candidate
 V = casos.PS.sym('v',monomials(x,degV));
@@ -25,7 +25,7 @@ s2    = casos.PS.sym('s2',monomials(x,2),[length(u) 1]);
 s3    = casos.PS.sym('s3',monomials(x,2),[length(u) 1]);
 s4    = casos.PS.sym('s4',monomials(x,2));
 b     = casos.PS.sym('b');
-kappa = casos.PS.sym('kappa',monomials(x,degK));
+kappa = casos.PS.sym('kappa',monomials(x,degK),[length(u) 1]);
 
 
 % fill structure

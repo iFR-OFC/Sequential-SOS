@@ -20,7 +20,7 @@ umin = probStruct.umin;
 umax = probStruct.umax;
 
 % options
-opts                              = struct('sossol','mosek');
+opts                              = struct('sossol',commonOpts.solver);
 opts.max_iter                     = commonOpts.maxiter;
 opts.sossol_options.newton_solver = [];
 opts.hessian_approx               = hess_est_method;
@@ -34,17 +34,18 @@ sos = struct('x',[V; s1;s2;s3;s4;kappa;b],... % decision variables
     'p',[]);                        % parameter
 
 % SOS constraints
-sos.('g') = [s1;
-    s2;
-    s3;
-    s4;
-    V-l;
-    b - 1e-6;
-    s1*(V-b)-nabla(V,x)*subs(f,u,kappa)-l;
-    s2*(V-b) + kappa - umin;
-    s3*(V-b) + umax - kappa;
-    s4*(V-b) - g
-    ];
+sos.('g') = [
+            s1;
+            s2;
+            s3;
+            s4;
+            V-l;
+            b - 1e-6;
+            s1*(V-b)-nabla(V,x)*subs(f,u,kappa)-l;
+            s2*(V-b) + kappa - umin;
+            s3*(V-b) + umax - kappa;
+            s4*(V-b) - g
+            ];
 
 % states + constraint cones
 opts.Kx      = struct('lin', length(sos.x));

@@ -43,7 +43,7 @@ enable_plot_convergence = true;
 enable_second_sequential = false;
 
 % run sequential additionally with a clearly infeasible initial guess
-enable_seq_badInit = true;
+enable_seq_badInit = false;
 
 % set to true to generate tikz figure using MATLAB2TIKZ
 genTikz = false;
@@ -64,15 +64,26 @@ deg    = 2;
 
 % number of links: the robot arm has 2*N states
 Nmin   = 2;
-Nmax   = 4;  % n = 2*N
-
-% initialize the cell array that accumulates one row per run of the results table
-tableRows = cell(0, 12);
+Nmax   = 7;  % n = 2*N
 
 % variable names of the results table (one row per run)
 tableVariableNames = {'Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
     'Build Time (CD)','Build Time (SQ)','Solve Time (CD)','Solve Time (SQ)', ...
     'Iterations (CD)','Iterations (SQ)','Final Cost (CD)','Final Cost (SQ)'};
+
+% extend the results table by the sequential run with the second Hessian
+% estimation method (cf. enable_second_sequential)
+if enable_second_sequential
+    tableVariableNames = [tableVariableNames, ...
+        ['Build Time (SQ ' hess_est_method_2 ')'], ...
+        ['Solve Time (SQ ' hess_est_method_2 ')'], ...
+        ['Iterations (SQ ' hess_est_method_2 ')'], ...
+        ['Final Cost (SQ ' hess_est_method_2 ')']];
+end
+
+% initialize the cell array that accumulates one row per run of the
+% results table (one column per table variable)
+tableRows = cell(0, numel(tableVariableNames));
 
 % initialize the cell arrays of stored runs (one entry per run)
 seqSolverStructs_regularization = {};
@@ -90,6 +101,7 @@ for kk = 1:(Nmax-Nmin+1)
 
     % generate problem structure (dynamics, polynomial dec. variables)
     probStruct_Nlink = generateNlink_probStruct(n,deg);
+
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_Nlink.Name, kk, Nmax-Nmin+1)
     fprintf('------------------------------------------------------------------------------------------\n')
@@ -138,7 +150,13 @@ for kk = 1:(Nmax-Nmin+1)
 
 
     % append the current run to the accumulating results table
-    tableRows = appendResultRow(tableRows,probStruct_Nlink,solStruct_CD_Nlink,solStruct_seq_Nlink_regularization);
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows,probStruct_Nlink,solStruct_CD_Nlink, ...
+            solStruct_seq_Nlink_regularization,solStruct_seq_Nlink_hessApprox2);
+    else
+        tableRows = appendResultRow(tableRows,probStruct_Nlink,solStruct_CD_Nlink, ...
+            solStruct_seq_Nlink_regularization);
+    end
 
     if enable_plot_convergence
         % Evaluate
@@ -318,6 +336,47 @@ end
 % ClarabelBenchmarks): all-solvers-failed runs must not distort the
 % profile denominators nor the shifted geometric means
 keep_p = any(solved_ps, 2);
+
+% additionally drop problems for which the solvers converged to
+% different local solutions (cf. Eq. (38) in Waechter & Biegler,
+% Math. Program. 106, 2004, p. 49): the final objective values of the
+% unsuccessful runs are omitted and the problem is discarded if
+% (f_*^max - f_*^min) / (1 + max(|f_*^min|, |f_*^max|)) > 1e-1
+keep_cost = true(n_p, 1);
+for p = 1:n_p
+    % problems already dropped above cannot enter the comparison
+    if ~keep_p(p)
+        continue
+    end
+    % final objective values f(x_*^s) of the successful runs of problem p
+    f_star = nan(n_s, 1);
+    % sequential runs of problem p, one per Hessian estimation method
+    for s = 1:numel(seqMethodStructs)
+        if solved_ps(p, s)
+            solStruct_seq = seqMethodStructs{s}{p};
+            f_star(s) = solStruct_seq.stats.single_iterations{end}.cost;
+        end
+    end
+    % coordinate-descent run of problem p
+    if solved_ps(p, n_s)
+        solStruct_cd = cdSolverStructs{p};
+        f_star(n_s) = solStruct_cd.stats.cost(end);
+    end
+    % f_*^max and f_*^min over the final objective values of the
+    % successful runs only (unsuccessful runs omitted)
+    f_star_max = max(f_star, [], 'omitnan');
+    f_star_min = min(f_star, [], 'omitnan');
+    % discard the problem if the final objective values are not close
+    if (f_star_max - f_star_min) / (1 + max(abs(f_star_min), abs(f_star_max))) > 1e-1
+        keep_cost(p) = false;
+    end
+end
+if any(keep_p & ~keep_cost)
+    fprintf('Cost exclusion (Eq. 38): discarded %d problem(s) with diverging final objective values\n', ...
+        sum(keep_p & ~keep_cost))
+end
+keep_p = keep_p & keep_cost;
+
 t_ps(~keep_p, :)      = [];
 solved_ps(~keep_p, :) = [];
 

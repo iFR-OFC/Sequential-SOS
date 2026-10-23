@@ -24,8 +24,8 @@ umax = probStruct.umax;
 startBuildTime = tic;
 
 % setup first solver
-sos = struct('x',[s1;s2;s3;s4],... % decision variables
-    'p',[V;kappa;b]);    % parameter
+sos = struct('x',[s1;s2;s3;s4;kappa],... % decision variables
+    'p',[V;b]);    % parameter
 
 % SOS constraints
 sos.('g') = [
@@ -46,15 +46,15 @@ opts.newton_solver = [];
 opts.error_on_fail = 0; % we do our own check in the main loop
 
 % solver for multiplier
-S1 = casos.sossol('S1','mosek',sos,opts);
+S1 = casos.sossol('S1',commonOpts.solver,sos,opts);
 
 
 % setup second solver
 cost = dot(g-(V-b),g-(V-b));
 
-sos = struct('x',[V;kappa;b],...            % decision variables
+sos = struct('x',[V;b],...            % decision variables
     'f',cost,...                            % cost
-    'p',[s1;s2;s3;s4]);  % parameter
+    'p',[s1;s2;s3;s4;kappa]);  % parameter
 
 % SOS constraints
 sos.('g') = [V-l;
@@ -73,7 +73,7 @@ opts.newton_solver = [];
 opts.error_on_fail = 0; % we do our own check in the main loop
 
 % setup solver: solveLyapunov function
-S2 = casos.sossol('S2','mosek',sos,opts);
+S2 = casos.sossol('S2',commonOpts.solver,sos,opts);
 
 totalBuildTime = toc(startBuildTime);
 
@@ -86,18 +86,17 @@ maxIter = commonOpts.maxiter;
 
 % initial guess [V;kappa;b] (same ordering as in x0)
 sol2_x = [x0(1);
-          x0(6);
-          x0(7)];
+          x0(end)];
 
 fprintf('-------------------------------------------------- \n')
 fprintf('Custom Coordinate Descent for Control Design \n')
 fprintf('-------------------------------------------------- \n')
 
 
-
 UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
 
 useBisection = false;
+
 %% V-s-iteration
 for iter = 1:maxIter
 
@@ -105,12 +104,12 @@ for iter = 1:maxIter
     %% s-step
     s1start = tic;
     % second fall-back
-    if useBisection
+    if useBisection 
 
         useBisection = false;
         % solver 1: s1-step
-        sos0 = struct('x',[s1;s2;s3;s4],... % decision variables
-            'p',[V;kappa;b]);    % parameter
+        sos0 = struct('x',[s1;s2;s3;s4;kappa],... % decision variables
+            'p',[V;b]);    % parameter
         
         % SOS constraints
         sos0.('g') = [
@@ -132,7 +131,7 @@ for iter = 1:maxIter
         opts.newton_solver =[];
 
         % build first solver
-        S0 = casos.sossol('S0','mosek',sos0,opts);
+        S0 = casos.sossol('S0',commonOpts.solver,sos0,opts);
 
         % bisection tolerances (see default value of SOSOPT/GSOSOPT
         relbistol = 1e-3;
@@ -143,17 +142,15 @@ for iter = 1:maxIter
 
             ptry = (ub+lb)/2;
 
-            sol0 = S0('p',[sol2_x(1:2); ptry]);
+            sol0 = S0('p',[sol2_x(1); ptry]);
 
             switch(S0.stats.UNIFIED_RETURN_STATUS)
                 case {'SOLVER_RET_SUCCESS'}
                          lb = ptry;
                          sol1_x = sol0.x;
                          % break; % take the first feasible level set
-                case {'SOLVER_RET_INFEASIBLE','SOLVER_RET_NAN','SOLVER_RET_UNKNOWN'}
+                case {'SOLVER_RET_INFEASIBLE','SOLVER_RET_NAN','SOLVER_RET_UNKNOWN','SOLVER_RET_LIMITED'}
                           ub = ptry;
-                otherwise 
-                       error('Finding a feasible level set failed!')
             end
         end
     
@@ -168,7 +165,7 @@ for iter = 1:maxIter
             % assume the initial guess is bad
             if iter <= 1
 
-                sol1_x = x0(2:5);
+                sol1_x = x0(2:end-1);
 
                 fprintf('Infeasible in solver 1 in iteration %d. We provide another initial guess. \n',iter)
 
@@ -204,8 +201,6 @@ for iter = 1:maxIter
             fprintf('Infeasible in solver 2 in iteration %d. We try a third initial guess! \n',iter)
             UNIFIED_RETURN_STATUS = S2.stats.UNIFIED_RETURN_STATUS;
             useBisection = true;
-           
-
         else
             fprintf('Infeasible in solver 2 in iteration %d; retaining previous iterate\n', iter);
             UNIFIED_RETURN_STATUS = S2.stats.UNIFIED_RETURN_STATUS;
@@ -253,26 +248,31 @@ if iter == maxIter
 end
 
 
-stats.iterations     = iter;
-stats.UNIFIED_RETURN_STATUS        = UNIFIED_RETURN_STATUS;
-stats.cost           = cost_CD;
+% ************************************************************************
+% check if coordinate-descent was infeasible after a few iterations
+% Note: in this case we did not reach the termination criterion, but have a
+% feasible solution
 
-if strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && iter < maxIter
-    stats.totalSolveTime = totalSolveTime;
-else
-    if iter < maxIter
-        stats.totalSolveTime = inf;
-    end
+% Meaning: We made more than 1 iteration and one of the subsolver was
+% infeasible we still return success
+if iter > 1 && ~strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS')
+    UNIFIED_RETURN_STATUS= 'SOLVER_RET_SUCCESS';
 end
+% ************************************************************************
 
+stats.iterations            = iter;
+stats.UNIFIED_RETURN_STATUS = UNIFIED_RETURN_STATUS;
+stats.cost                  = cost_CD;
+
+stats.totalSolveTime = totalSolveTime;
 stats.totalBuildTime = totalBuildTime;
 stats.solver1_stats  = S1.stats;
 stats.solver2_stats  = S2.stats;
 
 % store final solution
 sol.x.V     = sol2_x(1);
-sol.x.kappa = sol2_x(2);
-sol.x.b     = sol2_x(3);
+sol.x.kappa = sol1_x(end);
+sol.x.b     = sol2_x(1);
 sol.x.s1    = sol1_x(1);
 sol.x.s2    = sol1_x(2);
 sol.x.s3    = sol1_x(3);

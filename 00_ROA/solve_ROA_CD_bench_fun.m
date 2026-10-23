@@ -92,7 +92,7 @@ for iter = 1:maxIter
               
             else
                 fprintf('Infeasible in solver 1 in iteration %d; retaining previous iterate\n', iter);
-                UNIFIED_RETURN_STATUS = S1.stats.UNIFIED_RETURN_STATUS;;
+                UNIFIED_RETURN_STATUS = S1.stats.UNIFIED_RETURN_STATUS;
                 break
             end
         end
@@ -160,20 +160,24 @@ if iter == maxIter
     stats.totalSolveTime = totalSolveTime;
 end
 
+% ************************************************************************
+% check if coordinate-descent was infeasible after a few iterations
+% Note: in this case we did not reach the termination criterion, but have a
+% feasible solution
 
-
-stats.iterations     = iter;
-stats.UNIFIED_RETURN_STATUS        = UNIFIED_RETURN_STATUS;
-stats.cost           = cost_CD;
-
-if strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && iter < maxIter
-    stats.totalSolveTime = totalSolveTime;
-else
-    if iter < maxIter
-        stats.totalSolveTime = inf;
-    end
+% Meaning: We made more than 1 iteration and one of the subsolver was
+% infeasible we still return success
+if iter > 1 && ~strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS')
+    UNIFIED_RETURN_STATUS= 'SOLVER_RET_SUCCESS';
 end
+% ************************************************************************
 
+stats.iterations                = iter;
+stats.UNIFIED_RETURN_STATUS     = UNIFIED_RETURN_STATUS;
+stats.cost                      = cost_CD;
+
+
+stats.totalSolveTime = totalSolveTime;
 stats.totalBuildTime = totalBuildTime;
 stats.solver1_stats  = S1.stats;
 stats.solver2_stats  = S2.stats;
