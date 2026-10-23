@@ -7,7 +7,7 @@ deg = 2;
 % if only the polynomial dynamics are desired, use only_poly=1 
 only_poly = 0;
 
-for n = 2:4
+for n = 2:24
 nLinkRobot_dyn_ctrl = ['nLinkRobot_dyn_ctrl_n' num2str(n)];
 nLinkRobot_dyn_poly = ['nLinkRobot_dyn_poly_n' num2str(n) '_d' num2str(deg)];
 
