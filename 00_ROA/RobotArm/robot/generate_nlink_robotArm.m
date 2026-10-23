@@ -15,6 +15,8 @@ syms dtheta [1 n] real
 syms ddtheta [1 n] real
 syms tau [1 n-1] real
 
+ sym("theta", n)
+ 
 % Position of center of mass for each link
 x = sym(zeros(1, n));
 y = sym(zeros(1, n));

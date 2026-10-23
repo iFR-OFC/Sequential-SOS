@@ -1,93 +1,217 @@
-%--------------------------------------------------------------------------
+%% ***********************************************************************
 %
-%   Short Descirption:  Execute the benchmark for the N-link robot arm or
-%   just use the .mat file for reproduction (recommended). Note, running
-%   the full benchmark takes several hours depending on the computing
-%   hardware. The default value for evaluteOnlyFlag is true. To rerun, set
-%   to false.
+%  Region-of-attraction Estimation Benchmark Test Runner (N-link robot arm)
 %
+%  The benchmark solves the ROA problem for the N-link robot arm for
+%  N = Nmin:Nmax links (i.e., 2*N states) with polynomial degree deg. In
+%  contrast to the other ROA examples, the problem instances vary in the
+%  number of states, not in the polynomial degrees.
 %
-%   License: GNU GENERAL PUBLIC LICENSE Version 3
-%--------------------------------------------------------------------------
+%  Note 1: The N-link SOS problem differs slightly from the other ROA
+%  examples (the fixed level-set constant enters the constraint but not
+%  the cost), hence the problem-specific scripts
+%  solve_ROA_Nlink_seq_bench_fun.m and solve_ROA_Nlink_CD_bench_fun.m are
+%  used; both follow the structure, inputs, and outputs of the generic
+%  solve_ROA_seq_bench_fun.m and solve_ROA_CD_bench_fun.m.
+%
+%  Note 2: The user might select a second hessian approximation method for
+%  sequential. This is optional, but interesting in terms of convergence
+%  speed. Additionally, a clearly infeasible initial guess for sequential
+%  can be enabled.
+%
+%  License: GNU GENERAL PUBLIC LICENSE Version 3
+% ***********************************************************************
+set(groot, ...
+    'defaultTextInterpreter', 'latex', ...
+    'defaultAxesTickLabelInterpreter', 'latex', ...
+    'defaultLegendInterpreter', 'latex');
 
-
-clc
 close all
 clear
+clc
 
-addpath("robot/")
-deg    = 2;
-noRuns = 1;
-Nmax   = 4;  % n = 2*N 
+% add the problem specific folders
+thisDir = fileparts(mfilename('fullpath'));
+rootDir = fileparts(thisDir);
+addpath(rootDir)                      % appendResultRow, plotConvergence, perf_profile_cdf
+addpath(fullfile(rootDir,'F18'))      % evalSequential
+addpath(thisDir)                      % Nlink problem and solver scripts
+addpath(fullfile(thisDir,'robot'))    % dynamics and LQR data of the N-link robot arm
 
-% set to false to re-run benchmark
-evaluteOnlyFlag = false;
+% enable plotting of convergence for each run
+enable_plot_convergence = true;
+enable_second_sequential = false;
+
+% run sequential additionally with a clearly infeasible initial guess
+enable_seq_badInit = true;
+
 % set to true to generate tikz figure using MATLAB2TIKZ
 genTikz = false;
 
-if ~evaluteOnlyFlag
-startTotal = tic;
+% Hessian estimation methods of the sequential solver to compare
+hess_est_method_1 = 'regularization';      % our default (see also sequentialCommon.m)
+hess_est_method_2 = 'levenberg';           % 'BFGS', 'levenberg', 'mirroring'
 
-% run sequential SOS
-[fval_array_Seq, solverTimes_total_Seq,buildTimes_Seq,iteration_array_Seq,solStatus_array_Seq,solverStats_Seq] = ROA_Nlink_sequential(noRuns,deg,Nmax);
+% common options shared by the methods
+commonOpts.maxiter       = 100;
+commonOpts.tolerance_opt = 1e-4;
+commonOpts.maxSolveTime  = 3600;
+commonOpts.solver        = 'mosek';
 
-% run coordinate descent
-[fval_array_CD, solverTimes_total_CD,buildTimes_CD,iteration_array_CD,solverStats_CD] = ROA_Nlink_CD(noRuns,deg,Nmax);
+% only degree 2 to keep computational effort reasonable for larger number
+% of states
+deg    = 2;
 
-% run sequential SOS bad initial
-[fval_array_Seq_badInit, solverTimes_total_Seq_badInit,buildTimes_Seq_badInit,iteration_array_Seq_badInit,solStatus_array_Seq_badInit,solverStats_Seq_badInit] = ROA_Nlink_sequential_badInit(noRuns,deg,Nmax);
+% number of links: the robot arm has 2*N states
+Nmin   = 2;
+Nmax   = 4;  % n = 2*N
 
-totalBenchTime = toc(startTotal);
+% initialize the cell array that accumulates one row per run of the results table
+tableRows = cell(0, 12);
 
+% variable names of the results table (one row per run)
+tableVariableNames = {'Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
+    'Build Time (CD)','Build Time (SQ)','Solve Time (CD)','Solve Time (SQ)', ...
+    'Iterations (CD)','Iterations (SQ)','Final Cost (CD)','Final Cost (SQ)'};
+
+% initialize the cell arrays of stored runs (one entry per run)
+seqSolverStructs_regularization = {};
+seqSolverStructs_hessApprox2 = {};
+seqSolverStructs_badInit = {};
+cdSolverStructs  = {};
+
+% preallocate (only used if the corresponding run is disabled)
+evalSequentialStruct_Nlink_hessApprox2 = [];
+
+for kk = 1:(Nmax-Nmin+1)
+
+    % current number of links
+    n = Nmin + kk - 1;
+
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_Nlink = generateNlink_probStruct(n,deg);
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_Nlink.Name, kk, Nmax-Nmin+1)
+    fprintf('------------------------------------------------------------------------------------------\n')
+
+    % generate an initial guess
+    x0 = generate_initGuess_Nlink(probStruct_Nlink);
+
+    % solve Nlink example using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_Nlink_regularization = solve_ROA_Nlink_seq_bench_fun(probStruct_Nlink,commonOpts,x0,hess_est_method);
+
+    seqSolverStructs_regularization{end+1} = solStruct_seq_Nlink_regularization;
+
+    % extract size and timing statistic from sequential and add some meta
+    % data for plotting
+    evalSequentialStruct_Nlink_regularization                 = evalSequential(solStruct_seq_Nlink_regularization);
+    evalSequentialStruct_Nlink_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_Nlink_regularization.probNumber      = kk;
+
+
+    if enable_second_sequential
+
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_Nlink_hessApprox2 = solve_ROA_Nlink_seq_bench_fun(probStruct_Nlink,commonOpts,x0,hess_est_method);
+
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Nlink_hessApprox2;
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_Nlink_hessApprox2 = evalSequential(solStruct_seq_Nlink_hessApprox2);
+        evalSequentialStruct_Nlink_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_Nlink_hessApprox2.probNumber = kk;
+    end
+
+    if enable_seq_badInit
+        % solve Nlink example with a clearly infeasible initial guess
+        x0_bad = generate_initGuess_Nlink_badInit(probStruct_Nlink);
+        solStruct_seq_Nlink_badInit = solve_ROA_Nlink_seq_bench_fun(probStruct_Nlink,commonOpts,x0_bad,hess_est_method_1);
+
+        seqSolverStructs_badInit{end+1} = solStruct_seq_Nlink_badInit;
+    end
+
+    % solve Nlink example using custom coordinate-descent
+    solStruct_CD_Nlink = solve_ROA_Nlink_CD_bench_fun(probStruct_Nlink,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_Nlink;
+
+
+    % append the current run to the accumulating results table
+    tableRows = appendResultRow(tableRows,probStruct_Nlink,solStruct_CD_Nlink,solStruct_seq_Nlink_regularization);
+
+    if enable_plot_convergence
+        % Evaluate
+        plotConvergence(probStruct_Nlink, ...
+                        enable_second_sequential,...
+                        evalSequentialStruct_Nlink_regularization,...
+                        evalSequentialStruct_Nlink_hessApprox2,...
+                        solStruct_CD_Nlink)
+    end
+end
+
+% display the results table accumulated over all runs
+resultsTable = cell2table(tableRows,'VariableNames',tableVariableNames);
+disp(resultsTable)
+
+% store the results of all runs for later evaluation
+save('Nlink_benchmark_results.mat', ...
+    'seqSolverStructs_regularization','seqSolverStructs_hessApprox2', ...
+    'seqSolverStructs_badInit','cdSolverStructs','tableRows','tableVariableNames')
+
+
+%% Evaluation 
+
+runs = Nmin:Nmax;
+
+% extract solve times and iterations of the sequential runs
+solverTimes_total_Seq = cellfun(@(s) s.stats.total_solve_time, seqSolverStructs_regularization);
+iteration_array_Seq   = cellfun(@(s) s.stats.iterations,      seqSolverStructs_regularization);
+
+% extract solve times and iterations of the coordinate-descent runs
+solverTimes_total_CD  = cellfun(@(s) s.stats.totalSolveTime, cdSolverStructs);
+iteration_array_CD    = cellfun(@(s) s.stats.iterations,     cdSolverStructs);
 
 % post-processing of coordinate-descent, because some runs are infeasible,
-% and shall not appear in the computational statistics
-% see ROA_Nlink_CD.m; if infeasible cost is set to -1, so we only take the
-% once unequal to minus one.
+% and shall not appear in the computational statistics; infeasible runs
+% have a non-success return status
+idx_infes_cd = cellfun(@(s) strcmp(s.stats.UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS'), cdSolverStructs);
 
-idx_infes_cd = fval_array_CD ~=-1;
-
+% extract solve times and iterations of the sequential runs with bad initial guess
+if enable_seq_badInit
+    solverTimes_total_Seq_badInit = cellfun(@(s) s.stats.total_solve_time, seqSolverStructs_badInit);
+    iteration_array_Seq_badInit   = cellfun(@(s) s.stats.iterations,      seqSolverStructs_badInit);
 end
-
-%% evaluation
-% in case only evaluate use the provided matfile; otherwise take the fresh
-% results 
-if evaluteOnlyFlag
-    load Full_WS_withCDGratitude.mat
-end
-
-
-runs = 2:Nmax;
 
 % plot solve times
 figure('Name', 'Realtive improvement regarding solve times and iterations')
 subplot(211)
 hold on
-rel_solveTime = (solverTimes_total_CD(idx_infes_cd)'-solverTimes_total_Seq')./solverTimes_total_CD(idx_infes_cd)'*100;
+rel_solveTime = (solverTimes_total_CD(idx_infes_cd)'-solverTimes_total_Seq(idx_infes_cd)')./solverTimes_total_CD(idx_infes_cd)'*100;
 mean_solveTimeRel = mean(rel_solveTime);
 yline(mean_solveTimeRel)
 hold on
-bar(2*runs,rel_solveTime);
+bar(2*runs(idx_infes_cd),rel_solveTime);
 % xlabel('Number of states')
 legend('Mean value','rel. Improvement','Location','best')
 ylabel('Relative improvment in solve time in percent')
-xticks((2:Nmax)*2) 
+xticks((2:Nmax)*2)
 
 % plot iterations (no subiterations of feasibiltity restoration)
 subplot(212)
 hold on
-rel_iteration = (iteration_array_CD(idx_infes_cd)'-iteration_array_Seq')./iteration_array_CD(idx_infes_cd)'*100;
+rel_iteration = (iteration_array_CD(idx_infes_cd)'-iteration_array_Seq(idx_infes_cd)')./iteration_array_CD(idx_infes_cd)'*100;
 mean_rel_iteration = mean(rel_iteration);
 yline(mean_rel_iteration)
 hold on
-bar(2*runs,rel_iteration);
+bar(2*runs(idx_infes_cd),rel_iteration);
 xlabel('Number of states')
 ylabel('Relative improvment in iterations in percent')
 legend('Mean value','rel. Improvement','Location','best')
-xticks((2:Nmax)*2) 
+xticks((2:Nmax)*2)
 
 
-if genTikz 
+if genTikz
 cleanfigure();
 matlab2tikz('NlinkRobot.tex','width','\figW','height','\figH')
 end
@@ -102,7 +226,7 @@ semilogy(runs(idx_infes_cd)*2,solverTimes_total_CD(idx_infes_cd),'-^')
 xlabel('Number of states')
 ylabel('Solver time [s]')
 legend('sequential','coordinate-descent','Location','northwest')
-xticks((2:Nmax)*2) 
+xticks((2:Nmax)*2)
 
 % plot iterations (no subiterations of feasibiltity restoration)
 subplot(212)
@@ -112,14 +236,11 @@ plot(runs(idx_infes_cd)*2,iteration_array_CD(idx_infes_cd),'-^')
 xlabel('Number of states')
 ylabel('Iterations [-]')
 legend('sequential','coordinate-descent','Location','northwest')
-xticks((2:Nmax)*2) 
-
-
-
+xticks((2:Nmax)*2)
 
 
 % time per iteration
-figure(3)
+figure('Name', 'Time per iteration')
 plot(runs*2,solverTimes_total_Seq./iteration_array_Seq,'-o')
 hold on
 %plot(runs*2,solverTimes_total_Seq_badInit./iteration_array_Seq_badInit,'-o')
@@ -128,39 +249,176 @@ plot(runs(idx_infes_cd)*2,solverTimes_total_CD(idx_infes_cd)./iteration_array_CD
 xlabel('Number of states')
 ylabel('Time/iteration [s]')
 legend('sequential','coordinate-descent','Location','northwest')
-xticks((2:Nmax)*2) 
+xticks((2:Nmax)*2)
 
 % get number of linear constraints and decision variables (sequential)
-n_con = nan(length(solverStats_Seq),1);
-n_dec = nan(length(solverStats_Seq),1);
-for j = 1:length(solverStats_Seq)
-   n_con(j) = solverStats_Seq{j}{1}{end}.conic.size_A(1);
-   n_dec(j) = solverStats_Seq{j}{1}{end}.conic.size_A(2);
+n_con = nan(numel(runs),1);
+n_dec = nan(numel(runs),1);
+for j = 1:numel(runs)
+   n_con(j) = seqSolverStructs_regularization{j}.info.sossol_convex.sdpsol.conic.size_a(1);
+   n_dec(j) = seqSolverStructs_regularization{j}.info.sossol_convex.sdpsol.conic.size_a(2);
 end
 
 
-%% generate tables
-nStates = 2*runs';
-iteration  = iteration_array_Seq';
-times = solverTimes_total_Seq';
+%% Performance Profile (Dolan & More, Math. Program. 91, 2002)
 
-Table_seq = table(nStates,n_con,n_dec,iteration,times);
+% sequential runs stored per Hessian estimation method (cf. hess_est_method)
+seqMethodStructs = {seqSolverStructs_regularization};
+seqMethodNames   = {hess_est_method_1};
+if enable_second_sequential
+    seqMethodStructs{end+1} = seqSolverStructs_hessApprox2;
+    seqMethodNames{end+1}   = hess_est_method_2;
+end
 
+% solver names: one sequential solver per Hessian estimation method plus coordinate descent
+% (explicit loop: arrayfun/concat can produce nested cells, which fprintf rejects)
+solverNames = cell(1, numel(seqMethodNames) + 1);
+for s = 1:numel(seqMethodNames)
+    solverNames{s} = ['Sequential (' seqMethodNames{s} ')'];
+end
+solverNames{end} = 'Coordinate-descent';
 
-iteration  = iteration_array_CD;
-times = solverTimes_total_CD;
+% number of problems n_p: one stored run per cell entry
+n_p = numel(cdSolverStructs);
 
-Table_cd = table(nStates,n_con,n_dec,iteration,times);
+% number of solvers n_s: one sequential solver per Hessian estimation method and coordinate descent
+n_s = numel(solverNames);
 
+% computing time t_{p,s}: one row per problem p in P, one column per solver s in S
+% extract each run from the cell arrays of stored solver structs
+t_ps = zeros(n_p, n_s);
+for p = 1:n_p
+    % sequential runs of problem p, one per Hessian estimation method
+    for s = 1:numel(seqMethodStructs)
+        solStruct_seq = seqMethodStructs{s}{p};
+        t_ps(p, s) = solStruct_seq.stats.total_solve_time;
+    end
+    % coordinate-descent run of problem p
+    solStruct_cd  = cdSolverStructs{p};
+    % store the computing times t_{p,s} of all solvers
+    t_ps(p, n_s) = solStruct_cd.stats.totalSolveTime;
+end
 
-iteration  = iteration_array_Seq_badInit';
-times = solverTimes_total_Seq_badInit';
+% logical matrix: solved_ps(p,s) = true iff solver s solves problem p
+% a run only counts as solved for the return status 'SOLVER_RET_SUCCESS'
+solved_ps = false(n_p, n_s);
+for p = 1:n_p
+    % sequential runs of problem p, one per Hessian estimation method
+    for s = 1:numel(seqMethodStructs)
+        solStruct_seq = seqMethodStructs{s}{p};
+        solved_ps(p, s) = strcmp(solStruct_seq.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS');
+    end
+    % coordinate-descent run of problem p
+    solStruct_cd  = cdSolverStructs{p};
+    % solved_ps(p,n_s): coordinate descent
+    solved_ps(p, n_s) = strcmp(solStruct_cd.stats.UNIFIED_RETURN_STATUS,  'SOLVER_RET_SUCCESS');
+end
 
-Table_seq_bad = table(nStates,n_con,n_dec,iteration,times);
+% drop problems that no solver could solve (cf. drop_unsolvable! in
+% ClarabelBenchmarks): all-solvers-failed runs must not distort the
+% profile denominators nor the shifted geometric means
+keep_p = any(solved_ps, 2);
+t_ps(~keep_p, :)      = [];
+solved_ps(~keep_p, :) = [];
 
+% number of problems n_p remaining in the test set
+n_p = size(t_ps, 1);
 
-disp(Table_seq)
+% solver colors for reporting and plotting (cf. get_style)
+solverColors = lines(n_s);
 
-disp(Table_cd)
+% Shifted geometric means (cf. shifted_geometric_means in ClarabelBenchmarks)
 
-disp(Table_seq_bad)
+% shift k of the shifted geometric mean
+k_shift = 1;
+
+% enforce the solve time cap; failed solves count at the cap
+t_capped             = min(t_ps, commonOpts.maxSolveTime);
+t_capped(~solved_ps) = commonOpts.maxSolveTime;
+
+% shifted geometric mean g_s = exp( mean_p log(t_{p,s} + k) ) - k
+g_s = exp(mean(log(t_capped + k_shift), 1)) - k_shift;
+
+% normalized shifted geometric mean r_s: best solver scores 1
+r_s = g_s / min(g_s);
+
+% failure rate of each solver in percent
+failrate_s = 100 * sum(~solved_ps, 1) / n_p;
+
+% report the score table
+fprintf('Shifted geometric mean (shift k = %g, time cap %g s):\n', k_shift, commonOpts.maxSolveTime)
+for s = 1:n_s
+    fprintf('  %-18s: g_s = %8.2f s, normalized score r_s = %5.2f, failure rate = %5.1f %%\n', ...
+        solverNames{s}, g_s(s), r_s(s), failrate_s(s))
+end
+
+% Relative performance profile (cf. performance_profile in ClarabelBenchmarks)
+
+% failed solves have no valid time: their ratio is Inf, i.e. they never
+% count within the plotted range (this is Dolan & More's r_M convention)
+t_valid             = t_ps;
+t_valid(~solved_ps) = Inf;
+
+% relative performance ratio u_{p,s} = t_{p,s} / min{ t_{p,s} : s in S }
+% (u_{p,s} is exactly the performance ratio r_{p,s} of Dolan & More;
+%  the baseline minimum runs over successful solves only)
+u_ps = t_valid ./ min(t_valid, [], 2);
+
+% performance levels: tau = 10^k, k = 0 : 0.01 : 3 (cf. ClarabelBenchmarks)
+tau   = 10.^(0:0.01:3);
+f_s_r = perf_profile_cdf(u_ps, tau);
+
+% Absolute performance profile (cf. time_profile in ClarabelBenchmarks)
+
+% axis range: powers of ten bracketing the successful solve times
+min_time = 10^floor(log10(min(t_ps(solved_ps))));
+max_time = 10^ceil(log10(max(t_ps(solved_ps))));
+
+% exact step profile per solver at the sorted successful solve times;
+% failed solves raise no step, so the curve saturates below one
+for s = 1:n_s
+    % sorted solve times of the successful runs of solver s
+    t_s = sort(t_ps(solved_ps(:, s), s));
+    % fraction of problems solved within each time (denominator: all n_p)
+    y_s = (1:numel(t_s)).' / n_p;
+    % extend the step function to the axis corners
+    if isempty(t_s)
+        t_prof_s{s} = [min_time, max_time];
+        y_prof_s{s} = [0, 0];
+    else
+        t_prof_s{s} = [min_time; t_s; max_time];
+        y_prof_s{s} = [0; y_s; y_s(end)];
+    end
+end
+
+% Plot: two-panel performance profiles (cf. Fig. 1 in Clarabel)
+figure('Name', 'Performance Profiles')
+tiledlayout(1,2)
+
+% (a) relative performance profile
+ax_r = nexttile;
+for s = 1:n_s
+    semilogx(ax_r, tau, f_s_r(:, s), 'LineWidth', 2, 'Color', solverColors(s, :)), hold(ax_r, 'on')
+end
+grid(ax_r, 'on'), grid(ax_r, 'minor')
+xlim(ax_r, [1, 100]), ylim(ax_r, [0, 1])
+xticks(ax_r, [1, 10, 100])
+yticks(ax_r, 0:0.2:1)
+xlabel(ax_r, 'performance ratio $\tau$')
+ylabel(ax_r, 'ratio of problems solved')
+title(ax_r, 'Performance ratio')
+legend(ax_r, solverNames, 'Location', 'southeast')
+
+% (b) absolute performance profile
+ax_a = nexttile;
+for s = 1:n_s
+    semilogx(ax_a, t_prof_s{s}, y_prof_s{s}, 'LineWidth', 2, 'Color', solverColors(s, :)), hold(ax_a, 'on')
+end
+grid(ax_a, 'on'), grid(ax_a, 'minor')
+xlim(ax_a, [min_time, max_time]), ylim(ax_a, [0, 1])
+xticks(ax_a, 10.^(log10(min_time):log10(max_time)))
+yticks(ax_a, 0:0.2:1)
+xlabel(ax_a, 'solve time $t$ [s]')
+ylabel(ax_a, 'fraction of problems solved within $t$')
+title(ax_a, 'Solution time profile')
+legend(ax_a, solverNames, 'Location', 'southeast')

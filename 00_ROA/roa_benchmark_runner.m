@@ -52,7 +52,7 @@ hess_est_method_2 = 'levenberg';           % 'BFGS', 'levenberg', 'mirroring'
 commonOpts.maxiter       = 350;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
-commonOpts.solver        = 'clarabel';
+commonOpts.solver        = 'mosek';
 
 
 % initialize the cell array that accumulates one row per run of the results table
