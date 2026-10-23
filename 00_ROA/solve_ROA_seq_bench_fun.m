@@ -13,7 +13,7 @@ b  = probStruct.b;
 %% setup solver
 
 % options
-opts                              = struct('sossol','scs');
+opts                              = struct('sossol',commonOpts.solver);
 opts.max_iter                     = commonOpts.maxiter;
 opts.sossol_options.newton_solver = [];
 opts.hessian_approx               = hess_est_method;

@@ -32,10 +32,10 @@ end
 % ------------------------------------------------------------------------
 nexttile
 
-if evalSequentialStruct.iterations >= evalSequentialStruct_hessApprox2.iterations
-    maxIter = evalSequentialStruct.iterations;
+if enable_second_sequential
+    maxIter = max(evalSequentialStruct.iterations, evalSequentialStruct_hessApprox2.iterations);
 else
-    maxIter = evalSequentialStruct_hessApprox2.iterations;
+    maxIter = evalSequentialStruct.iterations;
 end
 % plot tolerance for constraint satisfaction
 plot([0 maxIter],[evalSequentialStruct.options.tolerance_con evalSequentialStruct.options.tolerance_con],'k--','LineWidth',1.2)

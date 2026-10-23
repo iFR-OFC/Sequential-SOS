@@ -46,12 +46,14 @@ enable_second_sequential = true;
 
 % Hessian estimation methods of the sequential solver to compare
 hess_est_method_1 = 'regularization'; % our default (see also sequentialCommon.m)
-hess_est_method_2 = 'BFGS';           % 'BFGS', 'levenberg', 'mirroring'
+hess_est_method_2 = 'levenberg';           % 'BFGS', 'levenberg', 'mirroring'
 
 % common options shared by the methods
 commonOpts.maxiter       = 350;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
+commonOpts.solver        = 'clarabel';
+
 
 % initialize the cell array that accumulates one row per run of the results table
 tableRows = cell(0, 12);
@@ -158,6 +160,8 @@ for kk = 1:numel(degV)
 
     % extract size and timing statistic from sequential
     evalSequentialStruct_MiMo_regularization = evalSequential(solStruct_seq_MiMo_regularization);
+    evalSequentialStruct_MiMo_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_MiMo_regularization.probNumber = kk;
 
     if enable_second_sequential
 
@@ -168,6 +172,8 @@ for kk = 1:numel(degV)
 
         % extract size and timing statistic from sequential
         evalSequentialStruct_MiMo_hessApprox2 = evalSequential(solStruct_seq_MiMo_hessApprox2);
+        evalSequentialStruct_MiMo_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_MiMo_hessApprox2.probNumber = kk;
     end
 
     % solve MiMo example with two states using custom coordinate-descent
@@ -183,39 +189,11 @@ for kk = 1:numel(degV)
 
     if enable_plot_convergence
         % Evaluate
-
-        % Plot convergence diagnostics
-        figure('Name','MiMo Benchmark')
-        tiledlayout(1,2)
-        nexttile
-        hessLegendNames = {hess_est_method_1};
-        semilogy(abs(evalSequentialStruct_MiMo_regularization.cost(2:end)-evalSequentialStruct_MiMo_regularization.cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
-        if enable_second_sequential
-            semilogy(abs(evalSequentialStruct_MiMo_hessApprox2.cost(2:end)-evalSequentialStruct_MiMo_hessApprox2.cost(1:end-1)),'LineWidth',1.2), hold on,
-            hessLegendNames{end+1} = hess_est_method_2;
-        end
-        semilogy(abs(solStruct_CD_MiMo.stats.cost(2:end)-solStruct_CD_MiMo.stats.cost(1:end-1)),'LineWidth',1.2), hold on,
-        xlabel('Iterations')
-        ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
-        hessLegendNames{end+1} = 'Coordinate-descent';
-        legend(hessLegendNames)
-
-        % constraint violation of sequential SOS
-        % ------------------------------------------------------------------------
-        % Note: If we are in the SOS cone, constraint violation is negative if
-        % signed distance is used. In that case, constraint violation is set to
-        % zero. For plotting on logarithmic scale zero values are set to eps!
-        % ------------------------------------------------------------------------
-        nexttile, semilogy(evalSequentialStruct_MiMo_regularization.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on
-        plot([0 solStruct_seq_MiMo_regularization.stats.iterations],[solStruct_seq_MiMo_regularization.stats.options.tolerance_con solStruct_seq_MiMo_regularization.stats.options.tolerance_con],'k--','LineWidth',1.2)
-        if enable_second_sequential
-            semilogy(evalSequentialStruct_MiMo_hessApprox2.maxConVio,'LineWidth',1.2), hold on
-            plot([0 solStruct_seq_MiMo_hessApprox2.stats.iterations],[solStruct_seq_MiMo_hessApprox2.stats.options.tolerance_con solStruct_seq_MiMo_hessApprox2.stats.options.tolerance_con],'k--','LineWidth',1.2)
-        end
-        plot([0 solStruct_seq_MiMo_regularization.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
-        xlabel('Iterations')
-        ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
-        legend([hessLegendNames(1:end-1), {'$\epsilon_\mathrm{con}$','eps'}])
+        plotConvergence(probStruct_MiMo, ...
+                        enable_second_sequential,...
+                        evalSequentialStruct_MiMo_regularization,...
+                        evalSequentialStruct_MiMo_hessApprox2,...
+                        solStruct_CD_MiMo)
     end
 end
 
@@ -249,6 +227,8 @@ for kk = 1:numel(degV)
 
     % extract size and timing statistic from sequential
     evalSequentialStruct_DoublePendulum_regularization = evalSequential(solStruct_seq_DoublePendulum_regularization);
+    evalSequentialStruct_DoublePendulum_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_DoublePendulum_regularization.probNumber = kk;
 
     if enable_second_sequential
 
@@ -259,6 +239,8 @@ for kk = 1:numel(degV)
 
         % extract size and timing statistic from sequential
         evalSequentialStruct_DoublePendulum_hessApprox2 = evalSequential(solStruct_seq_DoublePendulum_hessApprox2);
+        evalSequentialStruct_DoublePendulum_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_DoublePendulum_hessApprox2.probNumber = kk;
     end
 
     % solve DoublePendulum example with two states using custom coordinate-descent
@@ -274,39 +256,11 @@ for kk = 1:numel(degV)
 
     if enable_plot_convergence
         % Evaluate
-
-        % Plot convergence diagnostics
-        figure('Name','DoublePendulum Benchmark')
-        tiledlayout(1,2)
-        nexttile
-        hessLegendNames = {hess_est_method_1};
-        semilogy(abs(evalSequentialStruct_DoublePendulum_regularization.cost(2:end)-evalSequentialStruct_DoublePendulum_regularization.cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
-        if enable_second_sequential
-            semilogy(abs(evalSequentialStruct_DoublePendulum_hessApprox2.cost(2:end)-evalSequentialStruct_DoublePendulum_hessApprox2.cost(1:end-1)),'LineWidth',1.2), hold on,
-            hessLegendNames{end+1} = hess_est_method_2;
-        end
-        semilogy(abs(solStruct_CD_DoublePendulum.stats.cost(2:end)-solStruct_CD_DoublePendulum.stats.cost(1:end-1)),'LineWidth',1.2), hold on,
-        xlabel('Iterations')
-        ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
-        hessLegendNames{end+1} = 'Coordinate-descent';
-        legend(hessLegendNames)
-
-        % constraint violation of sequential SOS
-        % ------------------------------------------------------------------------
-        % Note: If we are in the SOS cone, constraint violation is negative if
-        % signed distance is used. In that case, constraint violation is set to
-        % zero. For plotting on logarithmic scale zero values are set to eps!
-        % ------------------------------------------------------------------------
-        nexttile, semilogy(evalSequentialStruct_DoublePendulum_regularization.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on
-        plot([0 solStruct_seq_DoublePendulum_regularization.stats.iterations],[solStruct_seq_DoublePendulum_regularization.stats.options.tolerance_con solStruct_seq_DoublePendulum_regularization.stats.options.tolerance_con],'k--','LineWidth',1.2)
-        if enable_second_sequential
-            semilogy(evalSequentialStruct_DoublePendulum_hessApprox2.maxConVio,'LineWidth',1.2), hold on
-            plot([0 solStruct_seq_DoublePendulum_hessApprox2.stats.iterations],[solStruct_seq_DoublePendulum_hessApprox2.stats.options.tolerance_con solStruct_seq_DoublePendulum_hessApprox2.stats.options.tolerance_con],'k--','LineWidth',1.2)
-        end
-        plot([0 solStruct_seq_DoublePendulum_regularization.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
-        xlabel('Iterations')
-        ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
-        legend([hessLegendNames(1:end-1), {'$\epsilon_\mathrm{con}$','eps'}])
+        plotConvergence(probStruct_DoublePendulum, ...
+                        enable_second_sequential,...
+                        evalSequentialStruct_DoublePendulum_regularization,...
+                        evalSequentialStruct_DoublePendulum_hessApprox2,...
+                        solStruct_CD_DoublePendulum)
     end
 end
 
@@ -340,6 +294,8 @@ for kk = 1:numel(degV)
 
     % extract size and timing statistic from sequential
     evalSequentialStruct_Aircraft_regularization = evalSequential(solStruct_seq_Aircraft_regularization);
+    evalSequentialStruct_Aircraft_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_Aircraft_regularization.probNumber = kk;
 
     if enable_second_sequential
 
@@ -350,6 +306,8 @@ for kk = 1:numel(degV)
 
         % extract size and timing statistic from sequential
         evalSequentialStruct_Aircraft_hessApprox2 = evalSequential(solStruct_seq_Aircraft_hessApprox2);
+        evalSequentialStruct_Aircraft_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_Aircraft_hessApprox2.probNumber = kk;
     end
 
     % solve Aircraft example with two states using custom coordinate-descent
@@ -364,39 +322,11 @@ for kk = 1:numel(degV)
 
     if enable_plot_convergence
         % Evaluate
-
-        % Plot convergence diagnostics
-        figure('Name','Aircraft Benchmark')
-        tiledlayout(1,2)
-        nexttile
-        hessLegendNames = {hess_est_method_1};
-        semilogy(abs(evalSequentialStruct_Aircraft_regularization.cost(2:end)-evalSequentialStruct_Aircraft_regularization.cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
-        if enable_second_sequential
-            semilogy(abs(evalSequentialStruct_Aircraft_hessApprox2.cost(2:end)-evalSequentialStruct_Aircraft_hessApprox2.cost(1:end-1)),'LineWidth',1.2), hold on,
-            hessLegendNames{end+1} = hess_est_method_2;
-        end
-        semilogy(abs(solStruct_CD_Aircraft.stats.cost(2:end)-solStruct_CD_Aircraft.stats.cost(1:end-1)),'LineWidth',1.2), hold on,
-        xlabel('Iterations')
-        ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
-        hessLegendNames{end+1} = 'Coordinate-descent';
-        legend(hessLegendNames)
-
-        % constraint violation of sequential SOS
-        % ------------------------------------------------------------------------
-        % Note: If we are in the SOS cone, constraint violation is negative if
-        % signed distance is used. In that case, constraint violation is set to
-        % zero. For plotting on logarithmic scale zero values are set to eps!
-        % ------------------------------------------------------------------------
-        nexttile, semilogy(evalSequentialStruct_Aircraft_regularization.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on
-        plot([0 solStruct_seq_Aircraft_regularization.stats.iterations],[solStruct_seq_Aircraft_regularization.stats.options.tolerance_con solStruct_seq_Aircraft_regularization.stats.options.tolerance_con],'k--','LineWidth',1.2)
-        if enable_second_sequential
-            semilogy(evalSequentialStruct_Aircraft_hessApprox2.maxConVio,'LineWidth',1.2), hold on
-            plot([0 solStruct_seq_Aircraft_hessApprox2.stats.iterations],[solStruct_seq_Aircraft_hessApprox2.stats.options.tolerance_con solStruct_seq_Aircraft_hessApprox2.stats.options.tolerance_con],'k--','LineWidth',1.2)
-        end
-        plot([0 solStruct_seq_Aircraft_regularization.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
-        xlabel('Iterations')
-        ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
-        legend([hessLegendNames(1:end-1), {'$\epsilon_\mathrm{con}$','eps'}])
+        plotConvergence(probStruct_Aircraft, ...
+                        enable_second_sequential,...
+                        evalSequentialStruct_Aircraft_regularization,...
+                        evalSequentialStruct_Aircraft_hessApprox2,...
+                        solStruct_CD_Aircraft)
     end
 
 end
@@ -431,6 +361,8 @@ for kk = 1:numel(degV)
 
     % extract size and timing statistic from sequential
     evalSequentialStruct_7D_regularization = evalSequential(solStruct_seq_7D_regularization);
+    evalSequentialStruct_7D_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_7D_regularization.probNumber = kk;
 
     if enable_second_sequential
 
@@ -441,6 +373,8 @@ for kk = 1:numel(degV)
 
         % extract size and timing statistic from sequential
         evalSequentialStruct_7D_hessApprox2 = evalSequential(solStruct_seq_7D_hessApprox2);
+        evalSequentialStruct_7D_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_7D_hessApprox2.probNumber = kk;
     end
 
     % solve F-18 example with seven states using custom coordinate-descent
@@ -455,38 +389,12 @@ for kk = 1:numel(degV)
 
 
     if enable_plot_convergence
-        % Plot convergence diagnostics
-        figure('Name','12State Benchmark')
-        tiledlayout(1,2)
-        nexttile
-        hessLegendNames = {hess_est_method_1};
-        semilogy(abs((evalSequentialStruct_7D_regularization.cost(2:end)-evalSequentialStruct_7D_regularization.cost(1:end-1))),'LineWidth',1.2), grid on, title('Cost'), hold on,
-        if enable_second_sequential
-            semilogy(abs((evalSequentialStruct_7D_hessApprox2.cost(2:end)-evalSequentialStruct_7D_hessApprox2.cost(1:end-1))),'LineWidth',1.2), hold on,
-            hessLegendNames{end+1} = hess_est_method_2;
-        end
-        semilogy(abs(solStruct_CD_7D.stats.cost(2:end)-solStruct_CD_7D.stats.cost(1:end-1)),'LineWidth',1.2), hold on,
-        xlabel('Iterations')
-        ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
-        hessLegendNames{end+1} = 'Coordinate-descent';
-        legend(hessLegendNames)
-
-        % constraint violation of sequential SOS
-        % ------------------------------------------------------------------------
-        % Note: If we are in the SOS cone, constraint violation is negative if
-        % signed distance is used. In that case, constraint violation is set to
-        % zero. For plotting on logarithmic scale zero values are set to eps!
-        % ------------------------------------------------------------------------
-        nexttile, semilogy(0:1:solStruct_seq_7D_regularization.stats.iterations, evalSequentialStruct_7D_regularization.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on
-        plot([0 solStruct_seq_7D_regularization.stats.iterations],[solStruct_seq_7D_regularization.stats.options.tolerance_con solStruct_seq_7D_regularization.stats.options.tolerance_con],'k--','LineWidth',1.2)
-        if enable_second_sequential
-            semilogy(0:1:solStruct_seq_7D_hessApprox2.stats.iterations, evalSequentialStruct_7D_hessApprox2.maxConVio,'LineWidth',1.2), hold on
-            plot([0 solStruct_seq_7D_hessApprox2.stats.iterations],[solStruct_seq_7D_hessApprox2.stats.options.tolerance_con solStruct_seq_7D_hessApprox2.stats.options.tolerance_con],'k--','LineWidth',1.2)
-        end
-        plot([0 solStruct_seq_7D_regularization.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
-        xlabel('Iterations')
-        ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
-        legend([hessLegendNames(1:end-1), {'$\epsilon_\mathrm{con}$','eps'}])
+        % Evaluate
+        plotConvergence(probStruct_F18, ...
+                        enable_second_sequential,...
+                        evalSequentialStruct_7D_regularization,...
+                        evalSequentialStruct_7D_hessApprox2,...
+                        solStruct_CD_7D)
     end
 
 end
@@ -513,6 +421,8 @@ seqSolverStructs_regularization{end+1} = solStruct_seq_12D_regularization;
 
 % extract size and timing statistic from sequential
 evalSequentialStruct_12D_regularization = evalSequential(solStruct_seq_12D_regularization);
+evalSequentialStruct_12D_regularization.hess_est_method = hess_est_method_1;
+evalSequentialStruct_12D_regularization.probNumber = 1;
 
 if enable_second_sequential
 
@@ -523,6 +433,8 @@ if enable_second_sequential
 
     % extract size and timing statistic from sequential
     evalSequentialStruct_12D_hessApprox2 = evalSequential(solStruct_seq_12D_hessApprox2);
+    evalSequentialStruct_12D_hessApprox2.hess_est_method = hess_est_method_2;
+    evalSequentialStruct_12D_hessApprox2.probNumber = 1;
 end
 
 % solve 12 state dynamical system example with 12 states using custom coordinate-descent
@@ -540,38 +452,12 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 
 if enable_plot_convergence
-    % Plot convergence diagnostics
-    figure('Name','12StateBenchmark')
-    tiledlayout(1,2)
-    nexttile
-    hessLegendNames = {hess_est_method_1};
-    semilogy(abs((evalSequentialStruct_12D_regularization.cost(2:end)-evalSequentialStruct_12D_regularization.cost(1:end-1))),'LineWidth',1.2), grid on, title('Cost'), hold on,
-    if enable_second_sequential
-        semilogy(abs((evalSequentialStruct_12D_hessApprox2.cost(2:end)-evalSequentialStruct_12D_hessApprox2.cost(1:end-1))),'LineWidth',1.2), hold on,
-        hessLegendNames{end+1} = hess_est_method_2;
-    end
-    semilogy(abs(solStruct_CD_12D.stats.cost(2:end)-solStruct_CD_12D.stats.cost(1:end-1)),'LineWidth',1.2), hold on,
-    xlabel('Iterations')
-    ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
-    hessLegendNames{end+1} = 'Coordinate-descent';
-    legend(hessLegendNames)
-
-    % constraint violation of sequential SOS
-    % ------------------------------------------------------------------------
-    % Note: If we are in the SOS cone, constraint violation is negative if
-    % signed distance is used. In that case, constraint violation is set to
-    % zero. For plotting on logarithmic scale zero values are set to eps!
-    % ------------------------------------------------------------------------
-    nexttile, semilogy(0:1:solStruct_seq_12D_regularization.stats.iterations, evalSequentialStruct_12D_regularization.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on
-    plot([0 solStruct_seq_12D_regularization.stats.iterations],[solStruct_seq_12D_regularization.stats.options.tolerance_con solStruct_seq_12D_regularization.stats.options.tolerance_con],'k--','LineWidth',1.2)
-    if enable_second_sequential
-        semilogy(0:1:solStruct_seq_12D_hessApprox2.stats.iterations, evalSequentialStruct_12D_hessApprox2.maxConVio,'LineWidth',1.2), hold on
-        plot([0 solStruct_seq_12D_hessApprox2.stats.iterations],[solStruct_seq_12D_hessApprox2.stats.options.tolerance_con solStruct_seq_12D_hessApprox2.stats.options.tolerance_con],'k--','LineWidth',1.2)
-    end
-    plot([0 solStruct_seq_12D_regularization.stats.iterations],[eps eps],'k-.','LineWidth',1.2)
-    xlabel('Iterations')
-    ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
-    legend([hessLegendNames(1:end-1), {'$\epsilon_\mathrm{con}$','eps'}])
+    % Evaluate
+    plotConvergence(probStruct_12State, ...
+                    enable_second_sequential,...
+                    evalSequentialStruct_12D_regularization,...
+                    evalSequentialStruct_12D_hessApprox2,...
+                    solStruct_CD_12D)
 end
 
 
