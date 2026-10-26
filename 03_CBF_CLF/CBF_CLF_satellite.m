@@ -109,7 +109,6 @@ s3 = casos.PS.sym('s3',monomials(x,0),[3 1]);
 s4 = casos.PS.sym('s4',monomials(x,0),[3 1]);
 s5 = casos.PS.sym('s5',monomials(x,2));
 
-alpha = casos.PS.sym('alpha');
 
 % fixed level set of terminal set
 b = 0.9;
@@ -181,13 +180,17 @@ Ksol_re = subs(K,x,Dx*x);
 
 
 S.info.sossol_convex.gram.Kc
+
 %%
-extractor = extractorClass(sos.x, sol.x);  
+extractor = extractorClass(sos.x, ...
+                           sol.x);  
 
 W_sol  = extractor.getSol(W);      % solved CBF polynomial (degree-2)
 V_sol  = extractor.getSol(V);      % solved CLF polynomial
 Kd_sol = extractor.getSol(Kd);     % solved 3x1 gain vector, shape preserved
 s1_sol = extractor.getSol(s1);
+
+
 
 %% Eval
 cost      = nan(S.stats.iterations,1);

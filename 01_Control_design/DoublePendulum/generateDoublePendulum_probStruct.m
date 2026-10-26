@@ -1,0 +1,54 @@
+
+function [probStruct] = generateDoublePendulum_probStruct(degV,degK)
+
+x = casos.Indeterminates('x',4,1);
+u = casos.Indeterminates('u',2,1);
+
+% generate closed-loop dynamics
+f = doublePendulumDynamics(x,u);
+
+
+% generate a desired safe set as superellipsoid
+n = 2;
+g = (x(1)^2/1^2)^(n/2) + (x(2)^2/1^2)^(n/2) + (x(3)^2/1^2)^(n/2) + ...
+     (x(4)^2/1^2)^(n/2) - 1;
+
+umax =  1;
+umin = -1;
+
+% Lyapunov function candidate
+V = casos.PS.sym('v',monomials(x,degV));
+
+
+% SOS multiplier
+s1    = casos.PS.sym('s1',monomials(x,2:4));
+s2    = casos.PS.sym('s2',monomials(x,2),[length(u) 1]);
+s3    = casos.PS.sym('s3',monomials(x,2),[length(u) 1]);
+s4    = casos.PS.sym('s4',monomials(x,2));
+b     = casos.PS.sym('b');
+kappa = casos.PS.sym('kappa',monomials(x,degK),[length(u) 1]);
+
+
+% fill structure
+probStruct.x    = x;        % indeterminates
+probStruct.u    = u;
+probStruct.f    = f;        % dynamics
+probStruct.g    = g;        % safe set
+
+
+probStruct.V    = V;        % Lyapunov function
+probStruct.s1   = s1;       % multiplier
+probStruct.s2   = s2;
+probStruct.s3   = s3;
+probStruct.s4   = s4;
+probStruct.b    = b;
+probStruct.umin = umin;
+probStruct.umax = umax;
+
+probStruct.kappa = kappa;
+
+probStruct.Name = 'Double-Pendulum'; % Name of example
+
+end
+
+ 
