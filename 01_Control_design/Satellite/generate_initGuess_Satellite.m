@@ -17,7 +17,21 @@ B0 = full(casos.PD(subs(nabla(f,u),[x;u],[x0;u0])));
 Q = diag([1, 1, 1, 1, 1 ,1]);
 R = eye(3)*1;
 
-[K,P] = lqr(A0,B0,Q,R);
+% platform flag: compute the LQR gain on macOS and store it; on Windows
+% and Linux load the stored values so that the initial guess is identical
+% across platforms (lqr/LAPACK is platform dependent)
+initfile = fullfile(fileparts(mfilename('fullpath')),'initGuess_Satellite.mat');
+isMac    = strncmp(computer,'MAC',3);
+
+if isMac
+    [K,P] = lqr(A0,B0,Q,R);
+    save(initfile,'K','P');
+else
+    assert(isfile(initfile),'Initial guess file "%s" not found. Generate it on macOS first.',initfile)
+    S = load(initfile);
+    K = S.K;
+    P = S.P;
+end
 
 % initial guess
 V0 = casos.PD(probStruct.g);

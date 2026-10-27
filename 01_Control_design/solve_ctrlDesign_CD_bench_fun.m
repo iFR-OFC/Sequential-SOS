@@ -44,6 +44,8 @@ opts.Kx           = struct('lin', length(sos.x));
 opts.Kc           = struct('sos', length(sos.g));
 opts.newton_solver = [];
 opts.error_on_fail = 0; % we do our own check in the main loop
+opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 
 % solver for multiplier
 S1 = casos.sossol('S1',commonOpts.solver,sos,opts);
@@ -71,6 +73,8 @@ opts.Kx   = struct('lin', length(sos.x));
 opts.Kc   = struct('sos', length(sos.g));
 opts.newton_solver = [];
 opts.error_on_fail = 0; % we do our own check in the main loop
+opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 
 % setup solver: solveLyapunov function
 S2 = casos.sossol('S2',commonOpts.solver,sos,opts);
@@ -129,6 +133,8 @@ for iter = 1:maxIter
         opts.Kc = struct('sos', length(sos0.g));
         opts.error_on_fail = 0;
         opts.newton_solver =[];
+        opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+        opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 
         % build first solver
         S0 = casos.sossol('S0',commonOpts.solver,sos0,opts);

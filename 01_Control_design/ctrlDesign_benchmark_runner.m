@@ -52,7 +52,18 @@ commonOpts.maxiter       = 350;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
 commonOpts.solver        = 'mosek';
-commonOpts.sdp_solver_opts.numThreads = 1;
+
+% MOSEK settings
+
+
+commonOpts.sdp_solver_opts.mosek_param = struct( ...
+    'MSK_IPAR_NUM_THREADS',            1); 
+
+commonOpts.sdp_solver_opts.mosek_echo = 0;
+    % 'MSK_DPAR_INTPNT_CO_TOL_PFEAS',    1e-7, ...
+    % 'MSK_DPAR_INTPNT_CO_TOL_DFEAS',    1e-7, ...
+    % 'MSK_DPAR_INTPNT_CO_TOL_REL_GAP',  1e-7, ...
+    % 'MSK_DPAR_INTPNT_CO_TOL_MU_RED',   1e-7);
 
 % variable names of the results table (one row per run)
 tableVariableNames = {'Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
@@ -225,6 +236,7 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 degV = {2  , 2:4, 1:4};
 degK = {1:2, 1:2, 1:2};
 
+
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
@@ -293,8 +305,7 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 % define the problem instances based on different polynomial degrees
 degV = {2  , 2:4, 2:4};
 degK = {1, 1, 1:2};
-degV = {2:4};
-degK = {1:2};
+
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
