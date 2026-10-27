@@ -134,8 +134,8 @@ for iter = 1:maxIter
         S0 = casos.sossol('S0',commonOpts.solver,sos0,opts);
 
         % bisection tolerances (see default value of SOSOPT/GSOSOPT
-        relbistol = 1e-3;
-        absbistol = 1e-3;
+        relbistol = 1e-6;
+        absbistol = 1e-6;
         lb = 0;
         ub = 100;
         while  (ub-lb>absbistol && ub-lb > relbistol*abs(lb))

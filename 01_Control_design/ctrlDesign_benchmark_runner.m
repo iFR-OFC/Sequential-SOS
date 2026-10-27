@@ -26,6 +26,9 @@ close all
 clear
 clc
 
+
+maxNumCompThreads(1);
+
 % add the problem specific folders
 addpath("VDP/")
 addpath("MultiInput/")
@@ -49,7 +52,7 @@ commonOpts.maxiter       = 350;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
 commonOpts.solver        = 'mosek';
-
+commonOpts.sdp_solver_opts.numThreads = 1;
 
 % variable names of the results table (one row per run)
 tableVariableNames = {'Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
@@ -290,7 +293,8 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 % define the problem instances based on different polynomial degrees
 degV = {2  , 2:4, 2:4};
 degK = {1, 1, 1:2};
-
+degV = {2:4};
+degK = {1:2};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
