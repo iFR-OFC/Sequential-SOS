@@ -30,12 +30,15 @@ close all
 clear
 clc
 
-% add the problem specific folders
-thisDir = fileparts(mfilename('fullpath'));
-rootDir = fileparts(thisDir);
-addpath(fullfile(fileparts(rootDir),'helperFunctions'))  % appendResultRow, plotConvergence, perf_profile_cdf, evalSequential
-addpath(thisDir)                      % Nlink problem and solver scripts
-addpath(fullfile(thisDir,'robot'))    % dynamics and LQR data of the N-link robot arm
+% add the problem specific folders and the shared helper functions
+thisDir  = fileparts(mfilename('fullpath'));
+addPaths = { ...
+    fullfile(fileparts(fileparts(thisDir)),'helperFunctions'), ... % appendResultRow, plotConvergence, perf_profile_cdf, evalSequential
+    thisDir, ...                                                 % Nlink problem and solver scripts
+    fullfile(thisDir,'robot')};                                  % dynamics and LQR data of the N-link robot arm
+for ii = 1:numel(addPaths)
+    addpath(addPaths{ii})
+end
 
 % enable plotting of convergence for each run
 enable_plot_convergence = true;
@@ -56,6 +59,19 @@ commonOpts.maxiter       = 100;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
 commonOpts.solver        = 'mosek';
+commonOpts.miniter       = 5; % minimum iterations before an aborted CD run still counts as successful
+
+% MOSEK settings
+
+
+commonOpts.sdp_solver_opts.mosek_param = struct( ...
+    'MSK_IPAR_NUM_THREADS',            1);
+
+commonOpts.sdp_solver_opts.mosek_echo = 0;
+    % 'MSK_DPAR_INTPNT_CO_TOL_PFEAS',    1e-7, ...
+    % 'MSK_DPAR_INTPNT_CO_TOL_DFEAS',    1e-7, ...
+    % 'MSK_DPAR_INTPNT_CO_TOL_REL_GAP',  1e-7, ...
+    % 'MSK_DPAR_INTPNT_CO_TOL_MU_RED',   1e-7);
 
 % only degree 2 to keep computational effort reasonable for larger number
 % of states
@@ -68,7 +84,8 @@ Nmax   = 7;  % n = 2*N
 % variable names of the results table (one row per run)
 tableVariableNames = {'Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
     'Build Time (CD)','Build Time (SQ)','Solve Time (CD)','Solve Time (SQ)', ...
-    'Iterations (CD)','Iterations (SQ)','Final Cost (CD)','Final Cost (SQ)'};
+    'Iterations (CD)','Iterations (SQ)','Final Cost (CD)','Final Cost (SQ)', ...
+    'Solved (CD)','Solved (SQ)'};
 
 % extend the results table by the sequential run with the second Hessian
 % estimation method (cf. enable_second_sequential)
@@ -77,7 +94,8 @@ if enable_second_sequential
         ['Build Time (SQ ' hess_est_method_2 ')'], ...
         ['Solve Time (SQ ' hess_est_method_2 ')'], ...
         ['Iterations (SQ ' hess_est_method_2 ')'], ...
-        ['Final Cost (SQ ' hess_est_method_2 ')']];
+        ['Final Cost (SQ ' hess_est_method_2 ')'], ...
+        ['Solved (SQ ' hess_est_method_2 ')']];
 end
 
 % initialize the cell array that accumulates one row per run of the
@@ -89,6 +107,7 @@ seqSolverStructs_regularization = {};
 seqSolverStructs_hessApprox2 = {};
 seqSolverStructs_badInit = {};
 cdSolverStructs  = {};
+probNames         = {}; % problem name per run (for the evaluation output)
 
 % preallocate (only used if the corresponding run is disabled)
 evalSequentialStruct_Nlink_hessApprox2 = [];
@@ -146,15 +165,16 @@ for kk = 1:(Nmax-Nmin+1)
     solStruct_CD_Nlink = solve_ROA_Nlink_CD_bench_fun(probStruct_Nlink,commonOpts,x0);
 
     cdSolverStructs{end+1} = solStruct_CD_Nlink;
+    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Nlink.Name, kk, Nmax-Nmin+1);
 
 
     % append the current run to the accumulating results table
     if enable_second_sequential
         tableRows = appendResultRow(tableRows,probStruct_Nlink,solStruct_CD_Nlink, ...
-            solStruct_seq_Nlink_regularization,solStruct_seq_Nlink_hessApprox2);
+            solStruct_seq_Nlink_regularization,solStruct_seq_Nlink_hessApprox2,true);
     else
         tableRows = appendResultRow(tableRows,probStruct_Nlink,solStruct_CD_Nlink, ...
-            solStruct_seq_Nlink_regularization);
+            solStruct_seq_Nlink_regularization,[],true);
     end
 
     if enable_plot_convergence
@@ -297,4 +317,10 @@ solverNames{end} = 'Coordinate-descent';
 
 % evaluate the stored test data: shifted geometric means and the
 % performance profile plots (legend labels passed as inputs)
-plotPerformanceProfiles(seqMethodStructs, cdSolverStructs, solverNames, commonOpts.maxSolveTime)
+plotPerformanceProfiles(seqMethodStructs, cdSolverStructs, solverNames, commonOpts.maxSolveTime, probNames)
+
+% remove the added folders from the path again now that the benchmarks
+% are done (exactly the folders added at the top of this script)
+for ii = 1:numel(addPaths)
+    rmpath(addPaths{ii})
+end

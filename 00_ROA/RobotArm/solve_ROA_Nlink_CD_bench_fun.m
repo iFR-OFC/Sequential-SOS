@@ -48,7 +48,9 @@ sos1.('g') = [s1; s1*(V-b0)-nabla(V,x)*f-l];
 opts.Kx = struct('lin', 1);
 opts.Kc = struct('sos', 2);
 opts.newton_solver =[];
-opts.error_on_fail = 0;
+opts.error_on_fail = 0; % we do our own check in the main loop
+opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 
 % build first solver
 S1 = casos.sossol('S1',commonOpts.solver ,sos1,opts);
@@ -66,7 +68,9 @@ opts     = struct;
 opts.Kx = struct('sos', 0, 'lin', 1);
 opts.Kc = struct('sos', 2);
 opts.newton_solver =[];
-opts.error_on_fail = 0;
+opts.error_on_fail = 0; % we do our own check in the main loop
+opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 
 % build third solver
 S2 = casos.sossol('S',commonOpts.solver ,sos2,opts);
@@ -91,6 +95,10 @@ fprintf('-------------------------------------------------- \n')
 
 UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
 
+% number of initial-guess restarts needed until the problem became feasible
+% (0: first guess feasible, 1: second starter needed, 2: third starter needed)
+initial_guess_trials = 0;
+
 %% V-s-iteration
 for iter = 1:maxIter
 
@@ -108,6 +116,8 @@ for iter = 1:maxIter
             if iter <= 1
 
                 s1val = x0(2);
+
+                initial_guess_trials = 1;
 
                 fprintf('Infeasible in solver 1 in iteration %d. We provide another initial guess. \n',iter)
 
@@ -169,23 +179,49 @@ end % end for-loop (inner)
 totalSolveTime = sum(solvetime_all1) + sum(solvetime_all2);
 
 
-fprintf('----------------------------------- \n')
-fprintf('Total solve time is %.2f s\n',totalSolveTime)
-fprintf('Total build time is %.2f s\n',totalBuildTime)
-fprintf('----------------------------------- \n')
-fprintf('Total time is %.2f s\n',totalBuildTime+totalSolveTime)
-
-
 if iter == maxIter
     UNIFIED_RETURN_STATUS = 'RET_LIMITED';
     stats.totalSolveTime = totalSolveTime;
 end
+
+% ************************************************************************
+% check if coordinate-descent was infeasible after a few iterations
+% Note: in this case we did not reach the termination criterion, but have a
+% feasible solution
+
+% Meaning: the run only counts as successful if a subsolver became
+% infeasible after a minimum number of iterations (cf. commonOpts.miniter)
+% and the cost function made some progress over these iterations;
+% otherwise the run is marked as RET_LIMITED
+if ~strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && iter < maxIter
+    if iter >= commonOpts.miniter && abs(cost_CD(1) - cost_CD(end)) > commonOpts.tolerance_opt
+        UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
+    else
+        UNIFIED_RETURN_STATUS = 'RET_LIMITED';
+    end
+end
+% ************************************************************************
+
+% summary output (cf. sequential solver)
+fprintf('------------------------------------------------------------------------------------------ \n')
+if strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS')
+    fprintf('Solution status: Optimal solution found\n')
+elseif iter == maxIter
+    fprintf('Solution status: Maximum number of iterations reached\n')
+else
+    fprintf('Solution status: Problem infeasible.\n')
+end
+fprintf('Solution time: %.4f s\n',totalSolveTime)
+fprintf('Build time: %.4f s\n',totalBuildTime)
+fprintf('Total time: %.4f s\n',totalBuildTime+totalSolveTime)
+fprintf('------------------------------------------------------------------------------------------ \n')
 
 
 
 stats.iterations     = iter;
 stats.UNIFIED_RETURN_STATUS        = UNIFIED_RETURN_STATUS;
 stats.cost           = cost_CD;
+stats.initial_guess_trials = initial_guess_trials;
 
 if strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && iter < maxIter
     stats.totalSolveTime = totalSolveTime;

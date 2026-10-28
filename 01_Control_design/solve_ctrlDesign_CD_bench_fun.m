@@ -101,6 +101,9 @@ UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
 
 useBisection = false;
 
+% number of initial-guess restarts needed until the problem became feasible
+initial_guess_trials = 1;
+
 %% V-s-iteration
 for iter = 1:maxIter
 
@@ -113,7 +116,8 @@ for iter = 1:maxIter
         useBisection = false;
         % solver 1: s1-step
         sos0 = struct('x',[s1;s2;s3;s4;kappa],... % decision variables
-            'p',[V;b]);    % parameter
+            'f',-b,...
+            'p',V);    % parameter
         
         % SOS constraints
         sos0.('g') = [
@@ -129,37 +133,32 @@ for iter = 1:maxIter
 
 
         % states + constraint are SOS cones
+        opts = [];
         opts.Kx = struct('lin', length(sos0.x));
         opts.Kc = struct('sos', length(sos0.g));
+        opts.sossol = 'mosek';
         opts.error_on_fail = 0;
-        opts.newton_solver =[];
-        opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
-        opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+        opts.sossol_options.newton_solver =[];
+        opts.sossol_options.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+        opts.sossol_options.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 
         % build first solver
-        S0 = casos.sossol('S0',commonOpts.solver,sos0,opts);
 
-        % bisection tolerances (see default value of SOSOPT/GSOSOPT
-        relbistol = 1e-6;
-        absbistol = 1e-6;
-        lb = 0;
-        ub = 100;
-        while  (ub-lb>absbistol && ub-lb > relbistol*abs(lb))
-
-            ptry = (ub+lb)/2;
-
-            sol0 = S0('p',[sol2_x(1); ptry]);
+        % solve by bisection
+        S0 = casos.qcsossol('S','bisection',sos0,opts);
+        % evaluate
+        sol0 = S0('p',casos.PD(sol2_x(1)));
 
             switch(S0.stats.UNIFIED_RETURN_STATUS)
                 case {'SOLVER_RET_SUCCESS'}
-                         lb = ptry;
+                   
                          sol1_x = sol0.x;
                          % break; % take the first feasible level set
-                case {'SOLVER_RET_INFEASIBLE','SOLVER_RET_NAN','SOLVER_RET_UNKNOWN','SOLVER_RET_LIMITED'}
-                          ub = ptry;
+                otherwise
+                    UNIFIED_RETURN_STATUS = S0.stats.UNIFIED_RETURN_STATUS;
+                    break
             end
-        end
-    
+ 
     else
         sol1 = S1('p',sol2_x);
 
@@ -172,6 +171,8 @@ for iter = 1:maxIter
             if iter <= 1
 
                 sol1_x = x0(2:end-1);
+
+                initial_guess_trials = 2;
 
                 fprintf('Infeasible in solver 1 in iteration %d. We provide another initial guess. \n',iter)
 
@@ -201,20 +202,22 @@ for iter = 1:maxIter
     if strcmp(S2.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS')
         % extract solution
         sol2_x = sol2.x;
-        old_UNIFIED_RETURN_STATUS2 = S2.stats.UNIFIED_RETURN_STATUS;
     else
         if iter <= 1
             fprintf('Infeasible in solver 2 in iteration %d. We try a third initial guess! \n',iter)
             UNIFIED_RETURN_STATUS = S2.stats.UNIFIED_RETURN_STATUS;
             useBisection = true;
+            initial_guess_trials = 3;
         else
             fprintf('Infeasible in solver 2 in iteration %d; retaining previous iterate\n', iter);
             UNIFIED_RETURN_STATUS = S2.stats.UNIFIED_RETURN_STATUS;
         end
 
+        % only break, in case we do not run the third initial guess
         if ~useBisection
         break
         end
+
     end
 
 
@@ -241,13 +244,6 @@ end % end for-loop (inner)
 totalSolveTime = sum(solvetime_all1) + sum(solvetime_all2);
 
 
-fprintf('----------------------------------- \n')
-fprintf('Total solve time is %.2f s\n',totalSolveTime)
-fprintf('Total build time is %.2f s\n',totalBuildTime)
-fprintf('----------------------------------- \n')
-fprintf('Total time is %.2f s\n',totalBuildTime+totalSolveTime)
-
-
 if iter == maxIter
     UNIFIED_RETURN_STATUS = 'RET_LIMITED';
     stats.totalSolveTime = totalSolveTime;
@@ -259,16 +255,37 @@ end
 % Note: in this case we did not reach the termination criterion, but have a
 % feasible solution
 
-% Meaning: We made more than 1 iteration and one of the subsolver was
-% infeasible we still return success
-if iter > 1 && ~strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS')
-    UNIFIED_RETURN_STATUS= 'SOLVER_RET_SUCCESS';
+% Meaning: the run only counts as successful if a subsolver became
+% infeasible after a minimum number of iterations (cf. commonOpts.miniter)
+% and the cost function made some progress over these iterations;
+% otherwise the run is marked as RET_LIMITED
+if ~strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && iter < maxIter
+    if iter >= commonOpts.miniter && abs(cost_CD(1) - cost_CD(end)) > commonOpts.tolerance_opt
+        UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
+    else
+        UNIFIED_RETURN_STATUS = 'RET_LIMITED';
+    end
 end
 % ************************************************************************
+
+% summary output (cf. sequential solver)
+fprintf('------------------------------------------------------------------------------------------ \n')
+if strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS')
+    fprintf('Solution status: Optimal solution found\n')
+elseif iter == maxIter
+    fprintf('Solution status: Maximum number of iterations reached\n')
+else
+    fprintf('Solution status: Problem infeasible.\n')
+end
+fprintf('Solution time: %.4f s\n',totalSolveTime)
+fprintf('Build time: %.4f s\n',totalBuildTime)
+fprintf('Total time: %.4f s\n',totalBuildTime+totalSolveTime)
+fprintf('------------------------------------------------------------------------------------------ \n')
 
 stats.iterations            = iter;
 stats.UNIFIED_RETURN_STATUS = UNIFIED_RETURN_STATUS;
 stats.cost                  = cost_CD;
+stats.initial_guess_trials  = initial_guess_trials;
 
 stats.totalSolveTime = totalSolveTime;
 stats.totalBuildTime = totalBuildTime;

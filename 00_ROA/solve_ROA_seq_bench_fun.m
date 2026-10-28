@@ -16,6 +16,8 @@ b  = probStruct.b;
 opts                              = struct('sossol',commonOpts.solver);
 opts.max_iter                     = commonOpts.maxiter;
 opts.sossol_options.newton_solver = [];
+opts.sossol_options.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+opts.sossol_options.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 opts.hessian_approx               = hess_est_method;
 
 

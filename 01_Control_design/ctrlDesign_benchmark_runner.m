@@ -29,18 +29,23 @@ clc
 
 maxNumCompThreads(1);
 
-% add the problem specific folders
-addpath("VDP/")
-addpath("MultiInput/")
-addpath("Aircraft_affine/")
-addpath("DoublePendulum/")
-addpath("Satellite/")
+% add the problem specific folders and the shared helper functions
+runnerDir = pwd;
 
-% add the shared helper functions (evaluation and plotting)
-addpath("../helperFunctions/")
+addPaths  = { ...
+    fullfile(runnerDir,'VDP'), ...
+    fullfile(runnerDir,'MultiInput'), ...
+    fullfile(runnerDir,'Aircraft_affine'), ...
+    fullfile(runnerDir,'Pendubot'),...
+    fullfile(runnerDir,'Quadcopter'),...
+    fullfile(runnerDir,'Satellite'), ...
+    fullfile(runnerDir,'..','helperFunctions')};
+for ii = 1:numel(addPaths)
+    addpath(addPaths{ii})
+end
 
 % enable plotting of convergence for each run
-enable_plot_convergence = false;
+enable_plot_convergence  = false;
 enable_second_sequential = false;
 
 % Hessian estimation methods of the sequential solver to compare
@@ -52,6 +57,7 @@ commonOpts.maxiter       = 350;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
 commonOpts.solver        = 'mosek';
+commonOpts.miniter       = 5; % minimum iterations before an aborted CD run still counts as successful
 
 % MOSEK settings
 
@@ -60,15 +66,13 @@ commonOpts.sdp_solver_opts.mosek_param = struct( ...
     'MSK_IPAR_NUM_THREADS',            1); 
 
 commonOpts.sdp_solver_opts.mosek_echo = 0;
-    % 'MSK_DPAR_INTPNT_CO_TOL_PFEAS',    1e-7, ...
-    % 'MSK_DPAR_INTPNT_CO_TOL_DFEAS',    1e-7, ...
-    % 'MSK_DPAR_INTPNT_CO_TOL_REL_GAP',  1e-7, ...
-    % 'MSK_DPAR_INTPNT_CO_TOL_MU_RED',   1e-7);
+
 
 % variable names of the results table (one row per run)
 tableVariableNames = {'Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
     'Build Time (CD)','Build Time (SQ)','Solve Time (CD)','Solve Time (SQ)', ...
-    'Iterations (CD)','Iterations (SQ)','Final Cost (CD)','Final Cost (SQ)'};
+    'Iterations (CD)','Iterations (SQ)','Final Cost (CD)','Final Cost (SQ)', ...
+    'Solved (CD)','Solved (SQ)'};
 
 % extend the results table by the sequential run with the second Hessian
 % estimation method (cf. enable_second_sequential)
@@ -77,7 +81,8 @@ if enable_second_sequential
         ['Build Time (SQ ' hess_est_method_2 ')'], ...
         ['Solve Time (SQ ' hess_est_method_2 ')'], ...
         ['Iterations (SQ ' hess_est_method_2 ')'], ...
-        ['Final Cost (SQ ' hess_est_method_2 ')']];
+        ['Final Cost (SQ ' hess_est_method_2 ')'], ...
+        ['Solved (SQ ' hess_est_method_2 ')']];
 end
 
 % initialize the cell array that accumulates one row per run of the
@@ -88,6 +93,7 @@ tableRows = cell(0, numel(tableVariableNames));
 seqSolverStructs_regularization = {};
 seqSolverStructs_hessApprox2    = {};
 cdSolverStructs                 = {};
+probNames                       = {}; % problem name per run (for the evaluation output)
 
 
 %% VDP
@@ -136,14 +142,15 @@ for kk = 1:numel(degV)
     solStruct_CD_VDP = solve_ctrlDesign_CD_bench_fun(probStruct_VDP,commonOpts,x0);
 
     cdSolverStructs{end+1} = solStruct_CD_VDP;
+    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_VDP.Name, kk, numel(degV));
 
     % append the current run to the accumulating results table
     if enable_second_sequential
         tableRows = appendResultRow(tableRows,probStruct_VDP,solStruct_CD_VDP, ...
-            solStruct_seq_VDP_regularization,solStruct_seq_VDP_hessApprox2);
+            solStruct_seq_VDP_regularization,solStruct_seq_VDP_hessApprox2,true);
     else
         tableRows = appendResultRow(tableRows,probStruct_VDP,solStruct_CD_VDP, ...
-                                    solStruct_seq_VDP_regularization);
+                                    solStruct_seq_VDP_regularization,[],true);
     end
 
     if enable_plot_convergence
@@ -206,14 +213,15 @@ for kk = 1:numel(degV)
     solStruct_CD_MiMo = solve_ctrlDesign_CD_bench_fun(probStruct_MiMo,commonOpts,x0);
 
     cdSolverStructs{end+1} = solStruct_CD_MiMo;
+    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_MiMo.Name, kk, numel(degV));
 
     % append the current run to the accumulating results table
     if enable_second_sequential
         tableRows = appendResultRow(tableRows,probStruct_MiMo,solStruct_CD_MiMo, ...
-            solStruct_seq_MiMo_regularization,solStruct_seq_MiMo_hessApprox2);
+            solStruct_seq_MiMo_regularization,solStruct_seq_MiMo_hessApprox2,true);
     else
         tableRows = appendResultRow(tableRows,probStruct_MiMo,solStruct_CD_MiMo, ...
-            solStruct_seq_MiMo_regularization);
+            solStruct_seq_MiMo_regularization,[],true);
     end
 
     if enable_plot_convergence
@@ -277,14 +285,15 @@ for kk = 1:numel(degV)
     solStruct_CD_Aircraft_affine = solve_ctrlDesign_CD_bench_fun(probStruct_Aircraft_affine,commonOpts,x0);
 
     cdSolverStructs{end+1} = solStruct_CD_Aircraft_affine;
+    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Aircraft_affine.Name, kk, numel(degV));
 
     % append the current run to the accumulating results table
     if enable_second_sequential
         tableRows = appendResultRow(tableRows,probStruct_Aircraft_affine,solStruct_CD_Aircraft_affine, ...
-            solStruct_seq_Aircraft_affine_regularization,solStruct_seq_Aircraft_affine_hessApprox2);
+            solStruct_seq_Aircraft_affine_regularization,solStruct_seq_Aircraft_affine_hessApprox2,true);
     else
         tableRows = appendResultRow(tableRows,probStruct_Aircraft_affine,solStruct_CD_Aircraft_affine, ...
-            solStruct_seq_Aircraft_affine_regularization);
+            solStruct_seq_Aircraft_affine_regularization,[],true);
     end
 
     if enable_plot_convergence
@@ -300,74 +309,150 @@ end
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
-%% Double Pendulum
+
+
+%% Pendubot
 
 % define the problem instances based on different polynomial degrees
-degV = {2  , 2:4, 2:4};
-degK = {1, 1, 1:2};
+degV = {2  , 2:4, 1:4};
+degK = {1:2, 1:2, 1:2};
+
 
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_DoublePendulum = generateDoublePendulum_probStruct(degV{kk},degK{kk});
+    probStruct_Pendubot = generatePendubot_probStruct(degV{kk},degK{kk});
     fprintf('------------------------------------------------------------------------------------------ \n')
-    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_DoublePendulum.Name, kk, numel(degV))
+    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_Pendubot.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_DoublePendulum(probStruct_DoublePendulum);
+    x0 = generate_initGuess_Pendubot(probStruct_Pendubot);
 
-    % solve DoublePendulum example with two states using sequential SOS
+    % solve Pendubot example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
-    solStruct_seq_DoublePendulum_regularization = solve_ctrlDesign_seq_bench_fun(probStruct_DoublePendulum,commonOpts,x0,hess_est_method);
+    solStruct_seq_Pendubot_regularization = solve_ctrlDesign_seq_bench_fun(probStruct_Pendubot,commonOpts,x0,hess_est_method);
 
-    seqSolverStructs_regularization{end+1} = solStruct_seq_DoublePendulum_regularization;
+    seqSolverStructs_regularization{end+1} = solStruct_seq_Pendubot_regularization;
 
     % extract size and timing statistic from sequential and add some meta
     % data for plotting
-    evalSequentialStruct_DoublePendulum_regularization                 = evalSequential(solStruct_seq_DoublePendulum_regularization);
-    evalSequentialStruct_DoublePendulum_regularization.hess_est_method = hess_est_method_1;
-    evalSequentialStruct_DoublePendulum_regularization.probNumber      = kk;
+    evalSequentialStruct_Pendubot_regularization                 = evalSequential(solStruct_seq_Pendubot_regularization);
+    evalSequentialStruct_Pendubot_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_Pendubot_regularization.probNumber      = kk;
 
     if enable_second_sequential
 
         hess_est_method = hess_est_method_2;
-        solStruct_seq_DoublePendulum_hessApprox2 = solve_ctrlDesign_seq_bench_fun(probStruct_DoublePendulum,commonOpts,x0,hess_est_method);
+        solStruct_seq_Pendubot_hessApprox2 = solve_ctrlDesign_seq_bench_fun(probStruct_Pendubot,commonOpts,x0,hess_est_method);
 
-        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_DoublePendulum_hessApprox2;
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Pendubot_hessApprox2;
 
         % extract size and timing statistic from sequential
-        evalSequentialStruct_DoublePendulum_hessApprox2 = evalSequential(solStruct_seq_DoublePendulum_hessApprox2);
-        evalSequentialStruct_DoublePendulum_hessApprox2.hess_est_method = hess_est_method_2;
-        evalSequentialStruct_DoublePendulum_hessApprox2.probNumber = kk;
+        evalSequentialStruct_Pendubot_hessApprox2 = evalSequential(solStruct_seq_Pendubot_hessApprox2);
+        evalSequentialStruct_Pendubot_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_Pendubot_hessApprox2.probNumber = kk;
     end
 
-    % solve DoublePendulum example with two states using custom coordinate-descent
-    solStruct_CD_DoublePendulum = solve_ctrlDesign_CD_bench_fun(probStruct_DoublePendulum,commonOpts,x0);
+    % solve Pendubot example with two states using custom coordinate-descent
+    solStruct_CD_Pendubot = solve_ctrlDesign_CD_bench_fun(probStruct_Pendubot,commonOpts,x0);
 
-    cdSolverStructs{end+1} = solStruct_CD_DoublePendulum;
+    cdSolverStructs{end+1} = solStruct_CD_Pendubot;
+    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Pendubot.Name, kk, numel(degV));
 
     % append the current run to the accumulating results table
     if enable_second_sequential
-        tableRows = appendResultRow(tableRows,probStruct_DoublePendulum,solStruct_CD_DoublePendulum, ...
-            solStruct_seq_DoublePendulum_regularization,solStruct_seq_DoublePendulum_hessApprox2);
+        tableRows = appendResultRow(tableRows,probStruct_Pendubot,solStruct_CD_Pendubot, ...
+            solStruct_seq_Pendubot_regularization,solStruct_seq_Pendubot_hessApprox2,true);
     else
-        tableRows = appendResultRow(tableRows,probStruct_DoublePendulum,solStruct_CD_DoublePendulum, ...
-            solStruct_seq_DoublePendulum_regularization);
+        tableRows = appendResultRow(tableRows,probStruct_Pendubot,solStruct_CD_Pendubot, ...
+            solStruct_seq_Pendubot_regularization,[],true);
     end
 
     if enable_plot_convergence
         % Evaluate
-        plotConvergence(probStruct_DoublePendulum, ...
+        plotConvergence(probStruct_Pendubot, ...
             enable_second_sequential,...
-            evalSequentialStruct_DoublePendulum_regularization,...
-            evalSequentialStruct_DoublePendulum_hessApprox2,...
-            solStruct_CD_DoublePendulum)
+            evalSequentialStruct_Pendubot_regularization,...
+            evalSequentialStruct_Pendubot_hessApprox2,...
+            solStruct_CD_Pendubot)
     end
 end
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
+
+% %% Copter
+% 
+% % define the problem instances based on different polynomial degrees
+% degV = {2  , 2:4, 1:4};
+% degK = {1:2, 1:2, 1:2};
+% 
+% 
+% for kk = 1:numel(degV)
+% 
+%     % generate problem structure (dynamics, polynomial dec. variables)
+%     probStruct_Copter = generateCopter_probStruct(degV{kk},degK{kk});
+%     fprintf('------------------------------------------------------------------------------------------ \n')
+%     fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_Copter.Name, kk, numel(degV))
+%     fprintf('------------------------------------------------------------------------------------------\n')
+% 
+%     % generate an initial guess
+%     x0 = generate_initGuess_Copter(probStruct_Copter);
+% 
+%     % solve Copter example with two states using sequential SOS
+%     hess_est_method = hess_est_method_1;
+%     solStruct_seq_Copter_regularization = solve_ctrlDesign_seq_bench_fun(probStruct_Copter,commonOpts,x0,hess_est_method);
+% 
+%     seqSolverStructs_regularization{end+1} = solStruct_seq_Copter_regularization;
+% 
+%     % extract size and timing statistic from sequential and add some meta
+%     % data for plotting
+%     evalSequentialStruct_Copter_regularization                 = evalSequential(solStruct_seq_Copter_regularization);
+%     evalSequentialStruct_Copter_regularization.hess_est_method = hess_est_method_1;
+%     evalSequentialStruct_Copter_regularization.probNumber      = kk;
+% 
+%     if enable_second_sequential
+% 
+%         hess_est_method = hess_est_method_2;
+%         solStruct_seq_Copter_hessApprox2 = solve_ctrlDesign_seq_bench_fun(probStruct_Copter,commonOpts,x0,hess_est_method);
+% 
+%         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Copter_hessApprox2;
+% 
+%         % extract size and timing statistic from sequential
+%         evalSequentialStruct_Copter_hessApprox2 = evalSequential(solStruct_seq_Copter_hessApprox2);
+%         evalSequentialStruct_Copter_hessApprox2.hess_est_method = hess_est_method_2;
+%         evalSequentialStruct_Copter_hessApprox2.probNumber = kk;
+%     end
+% 
+%     % solve Copter example with two states using custom coordinate-descent
+%     solStruct_CD_Copter = solve_ctrlDesign_CD_bench_fun(probStruct_Copter,commonOpts,x0);
+% 
+%     cdSolverStructs{end+1} = solStruct_CD_Copter;
+%     probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Copter.Name, kk, numel(degV));
+% 
+%     % append the current run to the accumulating results table
+%     if enable_second_sequential
+%         tableRows = appendResultRow(tableRows,probStruct_Copter,solStruct_CD_Copter, ...
+%             solStruct_seq_Copter_regularization,solStruct_seq_Copter_hessApprox2,true);
+%     else
+%         tableRows = appendResultRow(tableRows,probStruct_Copter,solStruct_CD_Copter, ...
+%             solStruct_seq_Copter_regularization,[],true);
+%     end
+% 
+%     if enable_plot_convergence
+%         % Evaluate
+%         plotConvergence(probStruct_Copter, ...
+%             enable_second_sequential,...
+%             evalSequentialStruct_Copter_regularization,...
+%             evalSequentialStruct_Copter_hessApprox2,...
+%             solStruct_CD_Copter)
+%     end
+% end
+% 
+% % display the results table accumulated over all runs so far
+% disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 
 %% Satellite
@@ -416,14 +501,15 @@ for kk = 1:numel(degV)
     solStruct_CD_Satellite = solve_ctrlDesign_CD_bench_fun(probStruct_Satellite,commonOpts,x0);
 
     cdSolverStructs{end+1} = solStruct_CD_Satellite;
+    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Satellite.Name, kk, numel(degV));
 
     % append the current run to the accumulating results table
     if enable_second_sequential
         tableRows = appendResultRow(tableRows,probStruct_Satellite,solStruct_CD_Satellite, ...
-            solStruct_seq_Satellite_regularization,solStruct_seq_Satellite_hessApprox2);
+            solStruct_seq_Satellite_regularization,solStruct_seq_Satellite_hessApprox2,true);
     else
         tableRows = appendResultRow(tableRows,probStruct_Satellite,solStruct_CD_Satellite, ...
-            solStruct_seq_Satellite_regularization);
+            solStruct_seq_Satellite_regularization,[],true);
     end
 
     if enable_plot_convergence
@@ -467,4 +553,10 @@ solverNames{end} = 'Coordinate-descent';
 
 % evaluate the stored test data: shifted geometric means and the
 % performance profile plots (legend labels passed as inputs)
-plotPerformanceProfiles(seqMethodStructs, cdSolverStructs, solverNames, commonOpts.maxSolveTime)
+plotPerformanceProfiles(seqMethodStructs, cdSolverStructs, solverNames, commonOpts.maxSolveTime, probNames)
+
+% remove the added folders from the path again now that the benchmarks
+% are done (exactly the folders added at the top of this script)
+for ii = 1:numel(addPaths)
+    rmpath(addPaths{ii})
+end

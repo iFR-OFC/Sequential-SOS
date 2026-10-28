@@ -5,7 +5,20 @@ x = probStruct.x;
 
 A_cl = subs(nabla(f,x),x,zeros(12,1));
 
-P = lyap(full(A_cl)',eye(12));
+% platform flag: compute the Lyapunov solution on macOS and store it; on
+% Windows and Linux load the stored values so that the initial guess is
+% identical across platforms (lyap/LAPACK is platform dependent)
+initfile = fullfile(fileparts(mfilename('fullpath')),'initGuess_12State.mat');
+isMac    = strncmp(computer,'MAC',3);
+
+if isMac
+    P = lyap(full(A_cl)',eye(12));
+    save(initfile,'P');
+else
+    assert(isfile(initfile),'Initial guess file "%s" not found. Generate it on macOS first.',initfile)
+    S = load(initfile);
+    P = S.P;
+end
 
 Vval = x'*P*x;
 

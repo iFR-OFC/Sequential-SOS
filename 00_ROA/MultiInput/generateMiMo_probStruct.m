@@ -12,13 +12,12 @@ f = [-x(1) + x(2)^2; -2*x(2) ; 3*x(3) + x(2)^3] + ...
 A0 = full(subs(nabla(f,x),[x;u],zeros(5,1)));
 B0 = full(subs(nabla(f,u),[x;u],zeros(5,1)));
 
-K = lqr(A0,B0,eye(3),eye(2));
+[K,P] = lqr(A0,B0,eye(3),eye(2));
 
 fcl  = subs(f,u,-K*x);
 
 % generate a desired safe set
-P = eye(3);
-g = x'*P*x-1;
+g = x'*P*x-2;
 
 % Lyapunov function candidate
 V = casos.PS.sym('v',monomials(x,degV));

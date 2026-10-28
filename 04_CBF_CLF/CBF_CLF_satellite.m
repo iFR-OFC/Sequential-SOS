@@ -118,8 +118,8 @@ opts = struct('sossol','mosek');
 
 opts.verbose       = 1;
 opts.max_iter      = 100;
-opts.tolerance_con = 1e-5;
-opts.tolerance_opt = 1e-1;
+% opts.tolerance_con = 1e-5;
+% opts.tolerance_opt = 1e-1;
 
 % fixed constant for comparison functions
 gammaV = 0.0025;

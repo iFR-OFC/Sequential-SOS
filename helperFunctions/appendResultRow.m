@@ -6,10 +6,26 @@
 % estimation method, cf. enable_second_sequential in the runner), the row
 % is extended by the build time, solve time, iterations, and final cost
 % of that run.
-function tableRows = appendResultRow(tableRows,probStruct,solStruct_cd,solStruct_seq,solStruct_seq_hessApprox2)
+%
+% If the sixth argument includeSolved is true, a solved column per runner
+% is appended (1 if the run was successful/feasible, 0 otherwise) instead
+% of the unified return status.
+function tableRows = appendResultRow(tableRows,probStruct,solStruct_cd,solStruct_seq,solStruct_seq_hessApprox2,includeSolved)
 
 % optional: sequential run with the second Hessian estimation method
 if nargin < 5
+    solStruct_seq_hessApprox2 = [];
+end
+
+% optional: append a solved flag (1/0) per runner
+if nargin < 6
+    includeSolved = false;
+end
+
+% guard: if the fifth argument is a logical, it is the includeSolved flag
+% (no second sequential run was passed)
+if islogical(solStruct_seq_hessApprox2)
+    includeSolved = solStruct_seq_hessApprox2;
     solStruct_seq_hessApprox2 = [];
 end
 
@@ -40,6 +56,13 @@ row = {probStruct.Name, n_con, n_dec, sizeGram, ...
     buildTimeCD, buildTimeSeq, solveTimeCD, solveTimeSeq, ...
     iterationsCD, iterationsSeq, finalCostCD, finalCostSeq};
 
+% solved flag per runner: 1 if the run was successful/feasible, 0 otherwise
+if includeSolved
+    solvedCD  = double(strcmp(solStruct_cd.stats.UNIFIED_RETURN_STATUS,  'SOLVER_RET_SUCCESS'));
+    solvedSeq = double(strcmp(solStruct_seq.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS'));
+    row = [row, solvedCD, solvedSeq];
+end
+
 % sequential with the second Hessian estimation method (if activated)
 if ~isempty(solStruct_seq_hessApprox2)
     solveTimeSeq2  = solStruct_seq_hessApprox2.stats.total_solve_time;
@@ -48,6 +71,11 @@ if ~isempty(solStruct_seq_hessApprox2)
     finalCostSeq2  = solStruct_seq_hessApprox2.stats.single_iterations{end}.cost;
 
     row = [row, buildTimeSeq2, solveTimeSeq2, iterationsSeq2, finalCostSeq2];
+
+    if includeSolved
+        solvedSeq2 = double(strcmp(solStruct_seq_hessApprox2.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS'));
+        row = [row, solvedSeq2];
+    end
 end
 
 tableRows(end+1, :) = row;

@@ -1,7 +1,13 @@
-function plotPerformanceProfiles(seqMethodStructs, cdSolverStructs, solverNames, maxSolveTime)
+function plotPerformanceProfiles(seqMethodStructs, cdSolverStructs, solverNames, maxSolveTime, probNames)
 
 % number of problems n_p: one stored run per cell entry
 n_p = numel(cdSolverStructs);
+
+% optional: problem names for the evaluation output (one per run);
+% if not provided, the runs are labeled by their index
+if nargin < 5
+    probNames = arrayfun(@(p) sprintf('Problem %d', p), (1:n_p).', 'UniformOutput', false);
+end
 
 % number of solvers n_s: one sequential solver per Hessian estimation method and coordinate descent
 n_s = numel(solverNames);
@@ -80,6 +86,21 @@ if any(keep_p & ~keep_cost)
         sum(keep_p & ~keep_cost))
 end
 keep_p = keep_p & keep_cost;
+
+% report which benchmarks are considered in the performance profile:
+% sorted out are problems that are infeasible for all solvers as well as
+% problems whose successful runs converged to different local solutions
+fprintf('--- Benchmark selection for the performance profile (%d of %d considered) ---\n', ...
+    nnz(keep_p), n_p)
+for p = 1:n_p
+    if ~any(solved_ps(p, :))
+        fprintf('  sorted out: %s (infeasible for all solvers)\n', probNames{p})
+    elseif ~keep_p(p)
+        fprintf('  sorted out: %s (diverging local costs, Eq. 38)\n', probNames{p})
+    else
+        fprintf('  considered: %s\n', probNames{p})
+    end
+end
 
 t_ps(~keep_p, :)      = [];
 solved_ps(~keep_p, :) = [];
