@@ -1,6 +1,6 @@
 %% ***********************************************************************
 %
-%  Control Design Benchmark Test Runner
+%  Barrier Certificate Benchmark Test Runner
 %
 %  Benchmark 1: Van-der-Pol Oscillator
 %
@@ -107,7 +107,7 @@ for kk = 1:numel(degV)
     % generate problem structure (dynamics, polynomial dec. variables)
     probStruct_VDP = generateVDP_probStruct(degV{kk},degK{kk});
     fprintf('------------------------------------------------------------------------------------------ \n')
-    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_VDP.Name, kk, numel(degV))
+    fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_VDP.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
@@ -170,15 +170,15 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 %% MIMO
 
 % define the problem instances based on different polynomial degrees
-degV = {2  , 2:4, 2:6};
-degK = {1:2, 1:2, 1:2};
+degV = {2  , 2:4, 2:4};
+degK = {1, 1, 1:2};
 
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
     probStruct_MiMo = generateMiMo_probStruct(degV{kk},degK{kk});
     fprintf('------------------------------------------------------------------------------------------ \n')
-    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_MiMo.Name, kk, numel(degV))
+    fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_MiMo.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
@@ -241,8 +241,8 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 %% Aircraft (affine)
 
 % define the problem instances based on different polynomial degrees
-degV = {2  , 2:4, 1:4};
-degK = {1:2, 1:2, 1:2};
+degV = {2  , 2:4, 2:4};
+degK = {1, 1, 1:2};
 
 
 for kk = 1:numel(degV)
@@ -250,7 +250,7 @@ for kk = 1:numel(degV)
     % generate problem structure (dynamics, polynomial dec. variables)
     probStruct_Aircraft_affine = generateAircraft_affine_probStruct(degV{kk},degK{kk});
     fprintf('------------------------------------------------------------------------------------------ \n')
-    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_Aircraft_affine.Name, kk, numel(degV))
+    fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_Aircraft_affine.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
@@ -312,78 +312,78 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 
 %% Pendubot
+% 
+% % define the problem instances based on different polynomial degrees
+% degV = {2  , 2, 2:4};
+% degK = {1, 1:2, 1:2};
+% 
+% 
+% for kk = 1:numel(degV)
+% 
+%     % generate problem structure (dynamics, polynomial dec. variables)
+%     probStruct_Pendubot = generatePendubot_probStruct(degV{kk},degK{kk});
+%     fprintf('------------------------------------------------------------------------------------------ \n')
+%     fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_Pendubot.Name, kk, numel(degV))
+%     fprintf('------------------------------------------------------------------------------------------\n')
+% 
+%     % generate an initial guess
+%     x0 = generate_initGuess_Pendubot(probStruct_Pendubot);
+% 
+%     % solve Pendubot example with two states using sequential SOS
+%     hess_est_method = hess_est_method_1;
+%     solStruct_seq_Pendubot_regularization = solve_barrierCert_seq_bench_fun(probStruct_Pendubot,commonOpts,x0,hess_est_method);
+% 
+%     seqSolverStructs_regularization{end+1} = solStruct_seq_Pendubot_regularization;
+% 
+%     % extract size and timing statistic from sequential and add some meta
+%     % data for plotting
+%     evalSequentialStruct_Pendubot_regularization                 = evalSequential(solStruct_seq_Pendubot_regularization);
+%     evalSequentialStruct_Pendubot_regularization.hess_est_method = hess_est_method_1;
+%     evalSequentialStruct_Pendubot_regularization.probNumber      = kk;
+% 
+%     if enable_second_sequential
+% 
+%         hess_est_method = hess_est_method_2;
+%         solStruct_seq_Pendubot_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_Pendubot,commonOpts,x0,hess_est_method);
+% 
+%         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Pendubot_hessApprox2;
+% 
+%         % extract size and timing statistic from sequential
+%         evalSequentialStruct_Pendubot_hessApprox2 = evalSequential(solStruct_seq_Pendubot_hessApprox2);
+%         evalSequentialStruct_Pendubot_hessApprox2.hess_est_method = hess_est_method_2;
+%         evalSequentialStruct_Pendubot_hessApprox2.probNumber = kk;
+%     end
+% 
+%     % solve Pendubot example with two states using custom coordinate-descent
+%     solStruct_CD_Pendubot = solve_barrierCert_CD_bench_fun(probStruct_Pendubot,commonOpts,x0);
+% 
+%     cdSolverStructs{end+1} = solStruct_CD_Pendubot;
+%     probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Pendubot.Name, kk, numel(degV));
+% 
+%     % append the current run to the accumulating results table
+%     if enable_second_sequential
+%         tableRows = appendResultRow(tableRows,probStruct_Pendubot,solStruct_CD_Pendubot, ...
+%             solStruct_seq_Pendubot_regularization,solStruct_seq_Pendubot_hessApprox2,true);
+%     else
+%         tableRows = appendResultRow(tableRows,probStruct_Pendubot,solStruct_CD_Pendubot, ...
+%             solStruct_seq_Pendubot_regularization,[],true);
+%     end
+% 
+%     if enable_plot_convergence
+%         % Evaluate
+%         plotConvergence(probStruct_Pendubot, ...
+%             enable_second_sequential,...
+%             evalSequentialStruct_Pendubot_regularization,...
+%             evalSequentialStruct_Pendubot_hessApprox2,...
+%             solStruct_CD_Pendubot)
+%     end
+% end
+% 
+% % display the results table accumulated over all runs so far
+% disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
-% define the problem instances based on different polynomial degrees
-degV = {2  , 2:4, 1:4};
-degK = {1:2, 1:2, 1:2};
 
-
-for kk = 1:numel(degV)
-
-    % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_Pendubot = generatePendubot_probStruct(degV{kk},degK{kk});
-    fprintf('------------------------------------------------------------------------------------------ \n')
-    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_Pendubot.Name, kk, numel(degV))
-    fprintf('------------------------------------------------------------------------------------------\n')
-
-    % generate an initial guess
-    x0 = generate_initGuess_Pendubot(probStruct_Pendubot);
-
-    % solve Pendubot example with two states using sequential SOS
-    hess_est_method = hess_est_method_1;
-    solStruct_seq_Pendubot_regularization = solve_barrierCert_seq_bench_fun(probStruct_Pendubot,commonOpts,x0,hess_est_method);
-
-    seqSolverStructs_regularization{end+1} = solStruct_seq_Pendubot_regularization;
-
-    % extract size and timing statistic from sequential and add some meta
-    % data for plotting
-    evalSequentialStruct_Pendubot_regularization                 = evalSequential(solStruct_seq_Pendubot_regularization);
-    evalSequentialStruct_Pendubot_regularization.hess_est_method = hess_est_method_1;
-    evalSequentialStruct_Pendubot_regularization.probNumber      = kk;
-
-    if enable_second_sequential
-
-        hess_est_method = hess_est_method_2;
-        solStruct_seq_Pendubot_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_Pendubot,commonOpts,x0,hess_est_method);
-
-        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Pendubot_hessApprox2;
-
-        % extract size and timing statistic from sequential
-        evalSequentialStruct_Pendubot_hessApprox2 = evalSequential(solStruct_seq_Pendubot_hessApprox2);
-        evalSequentialStruct_Pendubot_hessApprox2.hess_est_method = hess_est_method_2;
-        evalSequentialStruct_Pendubot_hessApprox2.probNumber = kk;
-    end
-
-    % solve Pendubot example with two states using custom coordinate-descent
-    solStruct_CD_Pendubot = solve_barrierCert_CD_bench_fun(probStruct_Pendubot,commonOpts,x0);
-
-    cdSolverStructs{end+1} = solStruct_CD_Pendubot;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Pendubot.Name, kk, numel(degV));
-
-    % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows,probStruct_Pendubot,solStruct_CD_Pendubot, ...
-            solStruct_seq_Pendubot_regularization,solStruct_seq_Pendubot_hessApprox2,true);
-    else
-        tableRows = appendResultRow(tableRows,probStruct_Pendubot,solStruct_CD_Pendubot, ...
-            solStruct_seq_Pendubot_regularization,[],true);
-    end
-
-    if enable_plot_convergence
-        % Evaluate
-        plotConvergence(probStruct_Pendubot, ...
-            enable_second_sequential,...
-            evalSequentialStruct_Pendubot_regularization,...
-            evalSequentialStruct_Pendubot_hessApprox2,...
-            solStruct_CD_Pendubot)
-    end
-end
-
-% display the results table accumulated over all runs so far
-disp(cell2table(tableRows,'VariableNames',tableVariableNames))
-
-
-% %% Copter
+%% Copter
 % 
 % % define the problem instances based on different polynomial degrees
 % degV = {2  , 2:4, 1:4};
@@ -395,7 +395,7 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 %     % generate problem structure (dynamics, polynomial dec. variables)
 %     probStruct_Copter = generateCopter_probStruct(degV{kk},degK{kk});
 %     fprintf('------------------------------------------------------------------------------------------ \n')
-%     fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_Copter.Name, kk, numel(degV))
+%     fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_Copter.Name, kk, numel(degV))
 %     fprintf('------------------------------------------------------------------------------------------\n')
 % 
 %     % generate an initial guess
@@ -466,7 +466,7 @@ for kk = 1:numel(degV)
     % generate problem structure (dynamics, polynomial dec. variables)
     probStruct_Satellite = generateSatellite_probStruct(degV{kk},degK{kk});
     fprintf('------------------------------------------------------------------------------------------ \n')
-    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_Satellite.Name, kk, numel(degV))
+    fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_Satellite.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess

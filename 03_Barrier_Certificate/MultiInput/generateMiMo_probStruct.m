@@ -1,5 +1,5 @@
 
-function [probStruct] = generateMiMo_probStruct(degV,degK)
+function [probStruct] = generateMiMo_probStruct(degB,degK)
 
 x = casos.Indeterminates('x',3,1);
 u = casos.Indeterminates('u',2,1);
@@ -15,13 +15,15 @@ B0 = full(subs(nabla(f,u),[x;u],zeros(5,1)));
 [~,P] = lqr(A0,B0,eye(3),eye(2));
 
 % generate a desired safe set
-g = x'*P*x-2;
+% state constraint
+n = 2;
+g = (x(1)^2/2^2)^(n/2) + (x(2)^2/2^2)^(n/2) + (x(3)^2/2^2)^(n/2) - 1;
 
 umax =  1;
 umin = -1;
 
-% Lyapunov function candidate
-V = casos.PS.sym('v',monomials(x,degV));
+% Barrier function candidate
+B = casos.PS.sym('B',monomials(x,degB));
 
 
 % SOS multiplier
@@ -40,7 +42,7 @@ probStruct.f    = f;        % dynamics
 probStruct.g    = g;        % safe set
 
 
-probStruct.V    = V;        % Lyapunov function
+probStruct.B    = B;        % Barrier function
 probStruct.s1   = s1;       % multiplier
 probStruct.s2   = s2;
 probStruct.s3   = s3;

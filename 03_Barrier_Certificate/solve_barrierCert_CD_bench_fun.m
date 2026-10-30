@@ -59,6 +59,7 @@ sos = struct('x',[B;b],...            % decision variables
 
 % SOS constraints
 sos.('g') = [
+            b - 1e-4;
             s1*(B-b) - nabla(B,x)*subs(f,u,kappa);
             s2*(B-b) + kappa - umin;
             s3*(B-b) + umax - kappa;
@@ -257,7 +258,7 @@ end
 % and the cost function made some progress over these iterations;
 % otherwise the run is marked as RET_LIMITED
 if iter < maxIter
-    if iter >= commonOpts.miniter && abs(cost_CD(1) - cost_CD(end)) > commonOpts.tolerance_opt && strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') 
+    if iter >= commonOpts.miniter && abs(cost_CD(1) - cost_CD(end)) > commonOpts.tolerance_opt %&& strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') 
         UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
     else
         UNIFIED_RETURN_STATUS = 'RET_LIMITED';

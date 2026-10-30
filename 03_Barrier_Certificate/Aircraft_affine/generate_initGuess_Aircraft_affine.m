@@ -26,7 +26,7 @@ else
 end
 
 % initial guess
-V0 = x'*P*x;
+B0 = x'*P*x;
 s20 = (x'*x)^2;
 s30 = x'*x;
 s40 = x'*x;
@@ -35,7 +35,7 @@ K0  = -K*x;
 b0  = 1;
 
 
-x0 = casos.PD([V0;s20;s30;s40;s50;K0;b0]);
+x0 = casos.PD([B0;s20;s30;s40;s50;K0;b0]);
 
 
 end

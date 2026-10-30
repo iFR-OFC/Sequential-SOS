@@ -1,5 +1,5 @@
 
-function [probStruct] = generateSatellite_probStruct(degV,degK)
+function [probStruct] = generateSatellite_probStruct(degB,degK)
 
 % system states
 x = casos.PS('x',6,1);
@@ -48,7 +48,7 @@ g0 = (x(1)^2/omegaMax1^2)^(n/2) + (x(2)^2/omegaMax2^2)^(n/2) + (x(3)^2/omegaMax3
 g = subs(g0,x,Dx\x); 
 
 % Lyapunov function candidate
-V = casos.PS.sym('v',monomials(x,degV));
+B = casos.PS.sym('v',monomials(x,degB));
 
 
 % SOS multiplier
@@ -67,7 +67,7 @@ probStruct.f    = f;        % dynamics
 probStruct.g    = g;        % safe set
 
 
-probStruct.V    = V;        % Lyapunov function
+probStruct.B    = B;        % Lyapunov function
 probStruct.s1   = s1;       % multiplier
 probStruct.s2   = s2;
 probStruct.s3   = s3;

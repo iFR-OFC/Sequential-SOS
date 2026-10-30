@@ -34,7 +34,7 @@ else
 end
 
 % initial guess
-V0 = casos.PD(probStruct.g);
+B0 = casos.PD(probStruct.g);
 s10 = (x'*x);
 s20 = ones(length(u),1);
 s30 = ones(length(u),1);
@@ -43,6 +43,6 @@ K0  = -K*x;
 b0  = 1;
 
 
-x0 = casos.PD([V0;s10;s20;s30;s40;K0;b0]);
+x0 = casos.PD([B0;s10;s20;s30;s40;K0;b0]);
 
 end

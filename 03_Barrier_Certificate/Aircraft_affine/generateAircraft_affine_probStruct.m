@@ -1,12 +1,12 @@
 
-function [probStruct] = generateAircraft_affine_probStruct(degV,degK)
+function [probStruct] = generateAircraft_affine_probStruct(degB,degK)
 
 % system states 
 x = casos.Indeterminates('x',4);
 u = casos.Indeterminates('u',1);
 
 
-x1 = x(1); % V 
+x1 = x(1); % B 
 x2 = x(2); % alpha
 x3 = x(3); % q
 x4 = x(4); % theta
@@ -67,7 +67,7 @@ umin = -(10*d2r + 0.0489);
 
 
 % Lyapunov function candidate
-V = casos.PS.sym('v',monomials(x,degV));
+B = casos.PS.sym('v',monomials(x,degB));
 
 
 % SOS multiplier
@@ -86,7 +86,7 @@ probStruct.f    = f;        % dynamics
 probStruct.g    = g;        % safe set
 
 
-probStruct.V    = V;        % Lyapunov function
+probStruct.B    = B;        % Lyapunov function
 probStruct.s1   = s1;       % multiplier
 probStruct.s2   = s2;
 probStruct.s3   = s3;

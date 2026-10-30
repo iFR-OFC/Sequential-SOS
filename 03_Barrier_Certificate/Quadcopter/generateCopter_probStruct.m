@@ -1,5 +1,5 @@
 
-function [probStruct] = generateCopter_probStruct(degV,degK)
+function [probStruct] = generateCopter_probStruct(degB,degK)
 
 x = casos.Indeterminates('x',6,1);
 u = casos.Indeterminates('u',2,1);
@@ -19,7 +19,7 @@ g = (x(1)^2/1.7^2)^(n/2) + (x(2)^2/0.85^2)^(n/2) + (x(3)^2/0.8^2)^(n/2) + ...
      (x(4)^2/1^2)^(n/2) + (x(5)^2/0.2618^2)^(n/2) + (x(6)^2/1.5708^2)^(n/2) - 1;
 
 % Lyapunov function candidate
-V = casos.PS.sym('v',monomials(x,degV));
+B = casos.PS.sym('v',monomials(x,degB));
 
 
 % SOS multiplier
@@ -38,7 +38,7 @@ probStruct.f    = f;        % dynamics
 probStruct.g    = g;        % safe set
 
 
-probStruct.V    = V;        % Lyapunov function
+probStruct.B    = B;        % Lyapunov function
 probStruct.s1   = s1;       % multiplier
 probStruct.s2   = s2;
 probStruct.s3   = s3;
