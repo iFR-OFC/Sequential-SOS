@@ -115,7 +115,7 @@ b = 0.9;
 
 % options for sequential sos
 opts = struct('sossol','mosek');
-
+opts.con_vio_check = 'signed-distance'; 'projection';
 opts.verbose       = 1;
 opts.max_iter      = 100;
 % opts.tolerance_con = 1e-1;
@@ -178,59 +178,26 @@ Vsol_re = subs(sol.x(2),x,Dx*x);
 K       = -sol.x(3:5).*x(1:3)-sol.x(6:8).*x(4:6);
 Ksol_re = subs(K,x,Dx*x);
 
-
-S.info.sossol_convex.gram.Kc
-
-%%
-extractor = extractorClass(sos.x, ...
-                           sol.x);  
-
-W_sol  = extractor.getSol(W);      % solved CBF polynomial (degree-2)
-V_sol  = extractor.getSol(V);      % solved CLF polynomial
-Kd_sol = extractor.getSol(Kd);     % solved 3x1 gain vector, shape preserved
-s1_sol = extractor.getSol(s1);
-
-
-
-%% Eval
-cost      = nan(S.stats.iterations,1);
-maxConVio = nan(S.stats.iterations,1);
-alpha     = nan(S.stats.iterations,1);
-counterSoC = nan(S.stats.iterations,1);
-counterLineserchSteps = nan(S.stats.iterations,1);
-counterFeasRes = nan(S.stats.iterations,1);
-for k = 1:S.stats.iterations
-    cost(k) = S.stats.single_iterations{k}.cost;
-    maxConVio(k) = S.stats.single_iterations{k}.max_con_vio;
-    alpha(k) = S.stats.single_iterations{k}.step_length;
-    counterFeasRes(k) = S.stats.single_iterations{k}.counter_restoration_calls;
-    counterSoC(k) = S.stats.single_iterations{k}.counter_correction_calls;
-    counterLineserchSteps(k) = S.stats.single_iterations{k}.counter_linesearch_calls;
-end
-
-
-% Plot convergence diagnostics
-figure
-tiledlayout(1,2)
-nexttile, semilogy(abs(cost(2:end)-cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
-      plot([0 S.stats.iterations],[S.stats.options.tolerance_opt S.stats.options.tolerance_opt],'k--','LineWidth',1.2)    
-nexttile, semilogy(maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation') , hold on 
-plot([0 S.stats.iterations],[S.stats.options.tolerance_con S.stats.options.tolerance_con],'k--','LineWidth',1.2)
-
-%%
+%% Run a sos feasibility with the solution
 % check if  solution is really SOS
+con_fun       = casos.Function('f',{sos.x},{sos.g});
 
-sos_conv = struct('g',sol.g);
+solg = remove_coeffs(con_fun(sol.x),1e-8);
+
+for k = 1:length(solg)
+sos_conv = struct('g',solg(k));
 
 % constraint is scalar SOS cone
-opts_conv = struct('Kc',struct('sos',19));
+opts_conv = struct('Kc',struct('sos',length(solg(k))));
+opts_conv.newton_solver =[];
 
 % turn off error on fail, otherwise it throws an error if infeasible
 % we want to manually check it below
-opts.error_on_fail = 0;
+opts_conv.error_on_fail = false;
 
 % solve by relaxation to SDP
 S_conv = casos.sossol('S','mosek',sos_conv,opts_conv);
+
 % evaluate
 sol_conv = S_conv();
 
@@ -238,4 +205,39 @@ if strcmp(S_conv.stats.UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS')
     disp('Given polynomial is SOS!')
 else
     disp('No decomposition found!')
+    k
 end
+
+end
+
+
+% %% Check proj
+% 
+% gsol0 = remove_coeffs(gsol10,1e-6);
+% 
+% % Gram decision variable
+% for k = 1:length(gsol0)
+% 
+% s = casos.PS.sym('q',grambasis(gsol0(k)));
+% 
+% 
+%     e = s - gsol0(k);
+% 
+% 
+% % projection error
+% 
+% 
+% % define Q-SOS problem:
+% %   min ||s-p||^2 s.t. s is SOS
+% sos = struct('x',s,'f',dot(e,e));
+% % states is scalar SOS cone
+% opts = struct('Kx',struct('sos',length(s)));
+% opts.error_on_fail = true;
+% % solve by relaxation to SDP
+% S = casos.sossol('S','mosek',sos,opts);
+% % evaluate
+% sol = S();
+% 
+% fprintf('Distance to SOS cone is %g.\n', full(sol.f))
+% 
+% end
