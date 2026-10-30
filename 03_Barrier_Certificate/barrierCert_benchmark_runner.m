@@ -40,6 +40,7 @@ addPaths  = { ...
     fullfile(runnerDir,'Quadcopter'),...
     fullfile(runnerDir,'Satellite'), ...
     fullfile(runnerDir,'..','helperFunctions')};
+
 for ii = 1:numel(addPaths)
     addpath(addPaths{ii})
 end
@@ -60,22 +61,18 @@ commonOpts.solver        = 'mosek';
 commonOpts.miniter       = 5; % minimum iterations before an aborted CD run still counts as successful
 
 % MOSEK settings
-
-
-commonOpts.sdp_solver_opts.mosek_param = struct( ...
-    'MSK_IPAR_NUM_THREADS',            1); 
-
-commonOpts.sdp_solver_opts.mosek_echo = 0;
+commonOpts.sdp_solver_opts.mosek_param = struct( 'MSK_IPAR_NUM_THREADS', 1); 
+commonOpts.sdp_solver_opts.mosek_echo  = 0;
 
 
 % variable names of the results table (one row per run)
 tableVariableNames = {'Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
-    'Build Time (CD)','Build Time (SQ)','Solve Time (CD)','Solve Time (SQ)', ...
-    'Iterations (CD)','Iterations (SQ)','Final Cost (CD)','Final Cost (SQ)', ...
-    'Solved (CD)','Solved (SQ)'};
+                        'Build Time (CD)','Build Time (SQ)','Solve Time (CD)','Solve Time (SQ)', ...
+                        'Iterations (CD)','Iterations (SQ)','Final Cost (CD)','Final Cost (SQ)', ...
+                        'Solved (CD)','Solved (SQ)'};
 
 % extend the results table by the sequential run with the second Hessian
-% estimation method (cf. enable_second_sequential)
+% estimation method (if enable_second_sequential == 1)
 if enable_second_sequential
     tableVariableNames = [tableVariableNames, ...
         ['Build Time (SQ ' hess_est_method_2 ')'], ...
@@ -86,7 +83,7 @@ if enable_second_sequential
 end
 
 % initialize the cell array that accumulates one row per run of the
-% results table (one column per table variable)
+% results table
 tableRows = cell(0, numel(tableVariableNames));
 
 % initialize the cell arrays of stored runs (one entry per run)
