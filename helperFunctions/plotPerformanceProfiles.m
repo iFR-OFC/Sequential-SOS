@@ -1,7 +1,16 @@
 function plotPerformanceProfiles(seqMethodStructs, cdSolverStructs, solverNames, maxSolveTime, probNames)
 
 % number of problems n_p: one stored run per cell entry
-n_p = numel(cdSolverStructs);
+% (if no coordinate-descent runs are given, e.g. for CBF-CLF, take the
+% number of sequential runs instead)
+if isempty(cdSolverStructs)
+    n_p = numel(seqMethodStructs{1});
+else
+    n_p = numel(cdSolverStructs);
+end
+
+% whether coordinate-descent runs are part of the comparison
+hasCD = ~isempty(cdSolverStructs);
 
 % optional: problem names for the evaluation output (one per run);
 % if not provided, the runs are labeled by their index
@@ -22,9 +31,11 @@ for p = 1:n_p
         t_ps(p, s) = solStruct_seq.stats.total_solve_time;
     end
     % coordinate-descent run of problem p
-    solStruct_cd  = cdSolverStructs{p};
-    % store the computing times t_{p,s} of all solvers
-    t_ps(p, n_s) = solStruct_cd.stats.totalSolveTime;
+    if hasCD
+        solStruct_cd  = cdSolverStructs{p};
+        % store the computing times t_{p,s} of all solvers
+        t_ps(p, n_s) = solStruct_cd.stats.totalSolveTime;
+    end
 end
 
 % logical matrix: solved_ps(p,s) = true iff solver s solves problem p
@@ -37,9 +48,11 @@ for p = 1:n_p
         solved_ps(p, s) = strcmp(solStruct_seq.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS');
     end
     % coordinate-descent run of problem p
-    solStruct_cd  = cdSolverStructs{p};
-    % solved_ps(p,n_s): coordinate descent
-    solved_ps(p, n_s) = strcmp(solStruct_cd.stats.UNIFIED_RETURN_STATUS,  'SOLVER_RET_SUCCESS');
+    if hasCD
+        solStruct_cd  = cdSolverStructs{p};
+        % solved_ps(p,n_s): coordinate descent
+        solved_ps(p, n_s) = strcmp(solStruct_cd.stats.UNIFIED_RETURN_STATUS,  'SOLVER_RET_SUCCESS');
+    end
 end
 
 % drop problems that no solver could solve (cf. drop_unsolvable! in
@@ -68,7 +81,7 @@ for p = 1:n_p
         end
     end
     % coordinate-descent run of problem p
-    if solved_ps(p, n_s)
+    if hasCD && solved_ps(p, n_s)
         solStruct_cd = cdSolverStructs{p};
         f_star(n_s) = solStruct_cd.stats.cost(end);
     end

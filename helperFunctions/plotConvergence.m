@@ -15,14 +15,21 @@ if enable_second_sequential
     semilogy(abs(evalSequentialStruct_hessApprox2.cost(2:end)-evalSequentialStruct_hessApprox2.cost(1:end-1)),'LineWidth',1.2), hold on,
 end
 
-semilogy(abs(solStruct_CD.stats.cost(2:end)-solStruct_CD.stats.cost(1:end-1)),'LineWidth',1.2), hold on,
+% coordinate descent is optional (not implemented for every benchmark,
+% e.g. CBF-CLF); pass [] as solStruct_CD to skip its curve
+if ~isempty(solStruct_CD)
+    semilogy(abs(solStruct_CD.stats.cost(2:end)-solStruct_CD.stats.cost(1:end-1)),'LineWidth',1.2), hold on,
+end
 xlabel('Iterations')
 ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
+legendLabels = {['Sequential' ' (' evalSequentialStruct.hess_est_method ')']};
 if enable_second_sequential
-    legend(['Sequential' ' (' evalSequentialStruct.hess_est_method ')'],['Sequential' ' (' evalSequentialStruct_hessApprox2.hess_est_method ')'],'Coordinate-descent')
-else
-    legend(['Sequential' ' (' evalSequentialStruct.hess_est_method ')'],'Coordinate-descent')
+    legendLabels{end+1} = ['Sequential' ' (' evalSequentialStruct_hessApprox2.hess_est_method ')'];
 end
+if ~isempty(solStruct_CD)
+    legendLabels{end+1} = 'Coordinate-descent';
+end
+legend(legendLabels{:})
 
 % constraint violation of sequential SOS
 % ------------------------------------------------------------------------

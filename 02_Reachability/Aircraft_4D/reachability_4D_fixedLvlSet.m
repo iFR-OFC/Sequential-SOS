@@ -89,7 +89,7 @@ um = -(10*d2r + 0.0489);
 
 % Lyapunov function candidate
 V    = casos.PS.sym('v', monomials([x;t],0:4));  %
-K    = casos.PS.sym('k',monomials([x;t],1));
+K    = casos.PS.sym('k',monomials([x;t],0:2));
 
 % SOS multiplier
 s2 = casos.PS.sym('s2',monomials([x;t],0:2));

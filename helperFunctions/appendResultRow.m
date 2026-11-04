@@ -29,11 +29,17 @@ if islogical(solStruct_seq_hessApprox2)
     solStruct_seq_hessApprox2 = [];
 end
 
+% optional: coordinate descent is not implemented for every benchmark
+% (e.g., CBF-CLF); pass [] as solStruct_cd to skip the CD columns
+hasCD = ~isempty(solStruct_cd);
+
 % coordinate descent
-solveTimeCD  = solStruct_cd.stats.totalSolveTime;
-iterationsCD = solStruct_cd.stats.iterations;
-buildTimeCD  = solStruct_cd.stats.totalBuildTime;
-finalCostCD  = solStruct_cd.stats.cost(end);
+if hasCD
+    solveTimeCD  = solStruct_cd.stats.totalSolveTime;
+    iterationsCD = solStruct_cd.stats.iterations;
+    buildTimeCD  = solStruct_cd.stats.totalBuildTime;
+    finalCostCD  = solStruct_cd.stats.cost(end);
+end
 
 % sequential
 solveTimeSeq  = solStruct_seq.stats.total_solve_time;
@@ -52,15 +58,23 @@ n_dec = int64(solStruct_seq.info.sossol_convex.sdpsol.conic.size_a(2));
 sizeGram = strjoin(string(solStruct_seq.info.sossol_convex.gram.Kc(:)).', ', ');
 
 % append the row for this run (sorted by problem and run order)
-row = {probStruct.Name, n_con, n_dec, sizeGram, ...
-    buildTimeCD, buildTimeSeq, solveTimeCD, solveTimeSeq, ...
-    iterationsCD, iterationsSeq, finalCostCD, finalCostSeq};
+row = {probStruct.Name, n_con, n_dec, sizeGram};
+if hasCD
+    row = [row, buildTimeCD, buildTimeSeq, solveTimeCD, solveTimeSeq, ...
+        iterationsCD, iterationsSeq, finalCostCD, finalCostSeq];
+else
+    row = [row, buildTimeSeq, solveTimeSeq, iterationsSeq, finalCostSeq];
+end
 
 % solved flag per runner: 1 if the run was successful/feasible, 0 otherwise
 if includeSolved
-    solvedCD  = double(strcmp(solStruct_cd.stats.UNIFIED_RETURN_STATUS,  'SOLVER_RET_SUCCESS'));
     solvedSeq = double(strcmp(solStruct_seq.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS'));
-    row = [row, solvedCD, solvedSeq];
+    if hasCD
+        solvedCD = double(strcmp(solStruct_cd.stats.UNIFIED_RETURN_STATUS,  'SOLVER_RET_SUCCESS'));
+        row = [row, solvedCD, solvedSeq];
+    else
+        row = [row, solvedSeq];
+    end
 end
 
 % sequential with the second Hessian estimation method (if activated)
