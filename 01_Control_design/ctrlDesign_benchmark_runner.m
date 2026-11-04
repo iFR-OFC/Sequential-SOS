@@ -53,7 +53,7 @@ hess_est_method_1 = 'regularization'; % our default (see also sequentialCommon.m
 hess_est_method_2 = 'mirroring';      % 'BFGS', 'levenberg', 'mirroring'
 
 % common options shared by the methods
-commonOpts.maxiter       = 350;
+commonOpts.maxiter       = 500;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
 commonOpts.solver        = 'mosek';
@@ -61,12 +61,12 @@ commonOpts.miniter       = 5; % minimum iterations before an aborted CD run stil
 
 % MOSEK settings
 
-
+if strcmpi(commonOpts.solver,'mosek')
 commonOpts.sdp_solver_opts.mosek_param = struct( ...
     'MSK_IPAR_NUM_THREADS',            1); 
 
 commonOpts.sdp_solver_opts.mosek_echo = 0;
-
+end
 
 % variable names of the results table (one row per run)
 tableVariableNames = {'Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...

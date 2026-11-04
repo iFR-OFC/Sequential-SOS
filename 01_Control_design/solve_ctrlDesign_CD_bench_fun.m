@@ -44,8 +44,11 @@ opts.Kx           = struct('lin', length(sos.x));
 opts.Kc           = struct('sos', length(sos.g));
 opts.newton_solver = [];
 opts.error_on_fail = 0; % we do our own check in the main loop
-opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
-opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+
+if  strcmpi(commonOpts.solver,'mosek')
+opts.sossol_options.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+opts.sossol_options.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+end
 
 % solver for multiplier
 S1 = casos.sossol('S1',commonOpts.solver,sos,opts);
@@ -73,11 +76,41 @@ opts.Kx   = struct('lin', length(sos.x));
 opts.Kc   = struct('sos', length(sos.g));
 opts.newton_solver = [];
 opts.error_on_fail = 0; % we do our own check in the main loop
-opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
-opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 
-% setup solver: solveLyapunov function
+if  strcmpi(commonOpts.solver,'mosek')
+opts.sossol_options.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+opts.sossol_options.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+end
+
+% setup solver: solve Lyapunov function
 S2 = casos.sossol('S2',commonOpts.solver,sos,opts);
+
+% common constraints for Lagrangian (same order as sequential solver)
+g_common  = [s1;
+             s2;
+             s3;
+             s4;
+             V-l;
+             b - 1e-6;
+             s1*(V-b) - nabla(V,x)*subs(f,u,kappa)-l;
+             s2*(V-b) + kappa - umin;
+             s3*(V-b) + umax - kappa;
+             s4*(V-b) - g];
+
+% same order as initial guess for decision variables
+sos_x     = [V;s1;s2;s3;s4;kappa;b];
+
+% get lagrange multiplier
+lam_gs    = casos.PS.sym('lam_gs', sparsity(g_common));
+
+% lagrangian
+lagrangian = casos.PS(cost + dot(lam_gs,g_common));
+
+% derivative lagrangian
+eval_gradLag  =  casos.Function('f',{sos_x,lam_gs}, { norm(jacobian( poly2basis(lagrangian), poly2basis(sos_x) ),inf) });
+
+% inf. norm of constraints (for scaled termination criterion)
+eval_gradLag_inf_norm  =  casos.Function('f',{sos_x,lam_gs}, { norm(poly2basis(casos.PS(dot(lam_gs,g_common))),inf) });
 
 totalBuildTime = toc(startBuildTime);
 
@@ -96,6 +129,9 @@ fprintf('-------------------------------------------------- \n')
 fprintf('Custom Coordinate Descent for Control Design \n')
 fprintf('-------------------------------------------------- \n')
 
+% x_prev for termination criterion; take initial guess as first "previous"
+% iteration
+x_prev = x0;
 
 UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
 
@@ -114,6 +150,7 @@ for iter = 1:maxIter
     if useBisection 
 
         useBisection = false;
+        s1_ok = false;
         % solver 1: s1-step
         sos0 = struct('x',[s1;s2;s3;s4;kappa],... % decision variables
             'f',-b,...
@@ -162,7 +199,8 @@ for iter = 1:maxIter
     else
         sol1 = S1('p',sol2_x);
 
-        if strcmp(S1.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS')
+        s1_ok = strcmp(S1.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS');
+        if s1_ok
             sol1_x = sol1.x;
             UNIFIED_RETURN_STATUS = S1.stats.UNIFIED_RETURN_STATUS;
         else
@@ -226,15 +264,46 @@ for iter = 1:maxIter
     fprintf('Iteration %d: f = %g\n',iter,full(sol2.f));
 
 
-    if ~isempty(fval_old)
-        if abs(full(sol2.f - fval_old)) <= commonOpts.tolerance_opt
-            break
-        else
-            fval_old = sol2.f;
-        end
+    % lam of s1..s4 (s2,s3 are nu-vectors) from S1, rest from S2
+    if s1_ok
+        % in same order as constraints    
+        lam_gs_it = [sol1.lam_g(1:length([s1;s2;s3;s4]));sol2.lam_g];
     else
-        fval_old = sol2.f;
+        % in case S1 was infeasible, set multiplier to zero
+        lam_gs_it = [zeros(length([s1;s2;s3;s4]),1);sol2.lam_g];
     end
+
+    % dec vars: V,b from S2; s1..s4,kappa from S1
+    sol_x_it  = [sol2.x(1);     % V from S2
+                 sol1_x;        % s1,s2,s3,s4 from S1
+                 sol2.x(end)];  % b from S2
+
+    % for scaled termination
+    delta_x     = sol_x_it - x_prev;
+    inf_delta_x = norm(full(poly2basis(delta_x)),inf);
+
+    % evaluate first order KKT at current iterate
+    nabla_L = full(eval_gradLag( sol_x_it,lam_gs_it));
+
+    inf_g   = full(eval_gradLag_inf_norm(sol_x_it,lam_gs_it));
+
+    % scaled termination criterion
+    if nabla_L < commonOpts.tolerance_opt*(max(1,abs(full(sol2.f)) + inf_g ))/inf_delta_x
+        break
+    else
+        % set current iterate to previous iterate
+        x_prev =  sol_x_it;
+    end
+
+    % if ~isempty(fval_old)
+    %     if abs(full(sol2.f - fval_old)) <= commonOpts.tolerance_opt
+    %         break
+    %     else
+    %         fval_old = sol2.f;
+    %     end
+    % else
+    %     fval_old = sol2.f;
+    % end
 
     end
 

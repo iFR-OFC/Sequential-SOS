@@ -23,8 +23,10 @@ umax = probStruct.umax;
 opts                              = struct('sossol',commonOpts.solver);
 opts.max_iter                     = commonOpts.maxiter;
 opts.sossol_options.newton_solver = [];
+if  strcmpi(commonOpts.solver,'mosek')
 opts.sossol_options.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
 opts.sossol_options.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+end
 opts.hessian_approx               = hess_est_method;
 
 
