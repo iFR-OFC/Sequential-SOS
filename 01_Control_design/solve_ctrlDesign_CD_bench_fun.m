@@ -46,8 +46,8 @@ opts.newton_solver = [];
 opts.error_on_fail = 0; % we do our own check in the main loop
 
 if  strcmpi(commonOpts.solver,'mosek')
-opts.sossol_options.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
-opts.sossol_options.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 end
 
 % solver for multiplier
@@ -78,8 +78,8 @@ opts.newton_solver = [];
 opts.error_on_fail = 0; % we do our own check in the main loop
 
 if  strcmpi(commonOpts.solver,'mosek')
-opts.sossol_options.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
-opts.sossol_options.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 end
 
 % setup solver: solve Lyapunov function

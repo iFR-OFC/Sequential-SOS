@@ -78,6 +78,31 @@ opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 % setup solver: solveLyapunov function
 S2 = casos.sossol('S2',commonOpts.solver,sos,opts);
 
+% common constraints for Lagrangian (same order as sequential solver)
+g_common  = [s2;
+             s3;
+             s4;
+             b - 1e-4;
+             s1*(B-b) - nabla(B,x)*subs(f,u,kappa);
+             s2*(B-b) + kappa - umin;
+             s3*(B-b) + umax - kappa;
+             s4*(B-b) - g];
+
+% same order as initial guess for decision variables
+sos_x     = [B;s1;s2;s3;s4;kappa;b];
+
+% get lagrange multiplier
+lam_gs    = casos.PS.sym('lam_gs', sparsity(g_common));
+
+% lagrangian
+lagrangian = casos.PS(cost + dot(lam_gs,g_common));
+
+% derivative lagrangian
+eval_gradLag  =  casos.Function('f',{sos_x,lam_gs}, { norm(jacobian( poly2basis(lagrangian), poly2basis(sos_x) ),inf) });
+
+% inf. norm of constraints (for scaled termination criterion)
+eval_gradLag_inf_norm  =  casos.Function('f',{sos_x,lam_gs}, { norm(poly2basis(casos.PS(dot(lam_gs,g_common))),inf) });
+
 totalBuildTime = toc(startBuildTime);
 
 
@@ -94,6 +119,10 @@ sol2_x = [x0(1);
 fprintf('-------------------------------------------------- \n')
 fprintf('Custom Coordinate Descent for Control Design \n')
 fprintf('-------------------------------------------------- \n')
+
+% x_prev for termination criterion; take initial guess as first "previous"
+% iteration
+x_prev = x0;
 
 
 UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
@@ -113,6 +142,7 @@ for iter = 1:maxIter
     if useBisection 
 
         useBisection = false;
+        s1_ok = false;
         % solver 1: s1-step
         sos0 = struct('x',[s1;s2;s3;s4;kappa],... % decision variables
             'f',-b,...
@@ -160,6 +190,7 @@ for iter = 1:maxIter
     else
         sol1 = S1('p',sol2_x);
 
+        s1_ok = strcmp(S1.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS');
         if strcmp(S1.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS')
             sol1_x = sol1.x;
             UNIFIED_RETURN_STATUS = S1.stats.UNIFIED_RETURN_STATUS;
@@ -224,15 +255,48 @@ for iter = 1:maxIter
     fprintf('Iteration %d: f = %g\n',iter,full(sol2.f));
 
 
-    if ~isempty(fval_old)
-        if abs(full(sol2.f - fval_old)) <= commonOpts.tolerance_opt
-            break
-        else
-            fval_old = sol2.f;
-        end
+    % lam of s2,s3,s4 (s2,s3 are nu-vectors) from S1, rest from S2
+    if s1_ok
+        % in same order as g_common (pairs correctly in dot(lam_gs_it,g_common))
+        lam_gs_it = [sol1.lam_g(1:length([s2;s3;s4]));  % s2,s3,s4 = g_common(1:k) from S1
+                     sol2.lam_g];                       % b-1e-4 + product terms = g_common(k+1:end) from S2
     else
-        fval_old = sol2.f;
+        % in case S1 was infeasible, set multiplier to zero
+        lam_gs_it = [zeros(length([s2;s3;s4]),1);        % s2,s3,s4 from S1 (infeasible -> zero)
+                     sol2.lam_g];                       % b-1e-4 + product terms from S2
     end
+
+    % dec vars: B,b from S2; s1..s4,kappa from S1
+    sol_x_it  = [sol2.x(1);     % B from S2
+                 sol1_x;        % s1,s2,s3,s4,kappa from S1
+                 sol2.x(end)];  % b from S2
+
+    % for scaled termination
+    delta_x     = sol_x_it - x_prev;
+    inf_delta_x = norm(full(poly2basis(delta_x)),inf);
+
+    % evaluate first order KKT at current iterate
+    nabla_L = full(eval_gradLag( sol_x_it,lam_gs_it));
+
+    inf_g   = full(eval_gradLag_inf_norm(sol_x_it,lam_gs_it));
+
+    % scaled termination criterion
+    if nabla_L < commonOpts.tolerance_opt*(max(1,abs(full(sol2.f)) + inf_g ))/inf_delta_x
+        break
+    else
+        % set current iterate to previous iterate
+        x_prev =  sol_x_it;
+    end
+
+    % if ~isempty(fval_old)
+    %     if abs(full(sol2.f - fval_old)) <= commonOpts.tolerance_opt
+    %         break
+    %     else
+    %         fval_old = sol2.f;
+    %     end
+    % else
+    %     fval_old = sol2.f;
+    % end
 
     end
 
