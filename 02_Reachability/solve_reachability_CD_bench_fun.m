@@ -16,7 +16,6 @@ s6 = probStruct.s6;
 s7 = probStruct.s7;
 s8 = probStruct.s8;
 s9 = probStruct.s9;
-s10 = probStruct.s10;
 gT  = probStruct.gT ;
 T = probStruct.T;
 
@@ -77,20 +76,19 @@ S1  = casos.sossol('S',commonOpts.solver,sos,opts);
 cost = dot( g-(subs(V,t,0)-b), g-(subs(V,t,0)-b) );
 
 opts = [];
-sos = struct('x',[V;b;s10],...
+sos = struct('x',[V;b],...
               'f', cost , ...
               'p',[kappa; s1; s2; s3; s4; s5; s6;s7;s8;s9]); %solution from solver 1
 
 
 % constraints
 sos.('g') = [
-             s10
+             b - 1e-6;
              s1*(V-b) - s2*hT - nabla(V,t) - nabla(V,x)*(subs(f,u,kappa));
              s3*(V-b) - s4*hT + kappa - umin;
              s5*(V-b) - s6*hT + umax - kappa;
              s7*(V-b) - s8*hT - g; 
              s9*(subs(V,t,T)-b)    - gT;
-             s10*gT  - subs(V,t,0) + b;
              ];
 
 % states + constraint are linear/SOS cones
@@ -113,16 +111,15 @@ g_common  = [s1;
              s7;
              s8;
              s9;
-             s10;
+             b - 1e-6;
              s1*(V-b) - s2*hT - nabla(V,t) - nabla(V,x)*subs(f,u,kappa);
              s3*(V-b) - s4*hT + kappa - umin;
              s5*(V-b) - s6*hT + umax - kappa;
              s7*(V-b) - s8*hT - g;
-             s9*(subs(V,t,T)-b) - gT;
-             s10*gT - subs(V,t,0) + b];
+             s9*(subs(V,t,T)-b) - gT];
 
 % same order as initial guess for decision variables
-sos_x     = [V;kappa;s1;s2;s3;s4;s5;s6;s7;s8;s9;s10;b];
+sos_x     = [V;kappa;s1;s2;s3;s4;s5;s6;s7;s8;s9;b];
 
 % get lagrange multiplier
 lam_gs    = casos.PS.sym('lam_gs', sparsity(g_common));
@@ -145,11 +142,10 @@ fval_old = [];
 
 maxIter = commonOpts.maxiter;
 
-% initial guess [V;b;s10]
+% initial guess [V;b]
 sol2_x = [
           x0(1);
           x0(end)
-          x0(end-1);
           ];
 
 fprintf('-------------------------------------------------- \n')
@@ -160,6 +156,10 @@ fprintf('-------------------------------------------------- \n')
 % iteration
 x_prev = x0;
 
+% fallback final solution (same order as the sequential solver) in case the
+% loop breaks before the first full iterate
+sol_x_it = x0;
+
 
 UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
 
@@ -167,6 +167,11 @@ useBisection = false;
 
 % number of initial-guess restarts needed until the problem became feasible
 initial_guess_trials = 1;
+
+% first-order KKT residual per iteration; stays inf if the loop breaks
+% before the first evaluation (e.g. a subsolver was infeasible)
+nabla_L        = inf;
+nabla_L_scaled = inf;
 
 %% V-s-iteration
 for iter = 1:maxIter
@@ -249,7 +254,7 @@ for iter = 1:maxIter
             if iter <= 1
                 
                 % take the same initial guess as sequential and try
-                sol1_x = x0(2:end-2); % all except V,b and s10
+                sol1_x = x0(2:end-1); % all except V,b
                 
                 % second try for initial guess
                 initial_guess_trials = 2;
@@ -319,7 +324,6 @@ for iter = 1:maxIter
         % dec vars: V,s10,b from S2; kappa,s1..s9 from S1
         sol_x_it  = [sol2.x(1);     % V from S2
                      sol1_x;        % kappa,s1..s9 from S1
-                     sol2.x(3);     % s10 from S2
                      sol2.x(2)];    % b from S2
 
         % for scaled termination
@@ -327,27 +331,21 @@ for iter = 1:maxIter
         inf_delta_x = norm(full(poly2basis(delta_x)),inf);
 
         % evaluate first order KKT at current iterate
-        nabla_L = full(eval_gradLag( sol_x_it,lam_gs_it));
+        nabla_L(iter) = full(eval_gradLag( sol_x_it,lam_gs_it));
 
         inf_g   = full(eval_gradLag_inf_norm(sol_x_it,lam_gs_it));
 
+        % just for plotting
+        nabla_L_scaled(iter) = nabla_L(iter)*inf_delta_x/(max(1,abs(full(sol2.f)) + inf_g ));
+
         % scaled termination criterion
-        if nabla_L < commonOpts.tolerance_opt*(max(1,abs(full(sol2.f)) + inf_g ))/inf_delta_x
+        if nabla_L(iter) <= commonOpts.tolerance_opt*(max(1,abs(full(sol2.f)) + inf_g ))/inf_delta_x
             break
         else
             % set current iterate to previous iterate
             x_prev =  sol_x_it;
         end
 
-        % if ~isempty(fval_old)
-        %     if abs(full(sol2.f - fval_old)) <= commonOpts.tolerance_opt
-        %         break
-        %     else
-        %         fval_old = sol2.f;
-        %     end
-        % else
-        %     fval_old = sol2.f;
-        % end
     end
 
 
@@ -401,6 +399,8 @@ fprintf('-----------------------------------------------------------------------
 stats.iterations            = iter;
 stats.UNIFIED_RETURN_STATUS = UNIFIED_RETURN_STATUS;
 stats.cost                  = cost_CD;
+stats.nabla_L               = nabla_L;
+stats.nabla_L_scaled        = nabla_L_scaled;
 stats.initial_guess_trials  = initial_guess_trials;
 
 stats.totalSolveTime = totalSolveTime;
@@ -408,9 +408,9 @@ stats.totalBuildTime = totalBuildTime;
 stats.solver1_stats  = S1.stats;
 stats.solver2_stats  = S2.stats;
 
-% store final solution
-
-sol.x = [sol2_x(1); sol1_x; sol2_x(2);sol2_x(3)];
+% store final solution (same order as the sequential solver's decision
+% variables, cf. sol_x_it in the main loop)
+sol.x = sol_x_it;
 
 solStruct.sol          = sol;
 solStruct.stats        = stats;

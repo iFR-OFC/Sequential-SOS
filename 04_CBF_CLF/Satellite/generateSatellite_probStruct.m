@@ -85,8 +85,8 @@ s4 = casos.PS.sym('s4',monomials(x,2),[length(u) 1]);
 s5 = casos.PS.sym('s5',monomials(x,2));
 
 % rates of the comparison functions
-gammaV = casos.PS.sym('gammaV');
-gammaW = casos.PS.sym('gammaW');
+gammaV = 0.001; %casos.PS.sym('gammaV');
+gammaW = 0.001; %casos.PS.sym('gammaW');
 
 % level set of terminal set
 b = casos.PS.sym('b');

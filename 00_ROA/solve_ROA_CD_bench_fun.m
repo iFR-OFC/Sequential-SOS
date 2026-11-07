@@ -103,6 +103,11 @@ UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
 % (0: first guess feasible, 1: second starter needed, 2: third starter needed)
 initial_guess_trials = 0;
 
+% first-order KKT residual per iteration; stays inf if the loop breaks
+% before the first evaluation (e.g. a subsolver was infeasible)
+nabla_L        = inf;
+nabla_L_scaled = inf;
+
 %% V-s-iteration
 for iter = 1:maxIter
 
@@ -181,12 +186,15 @@ for iter = 1:maxIter
      inf_delta_x = norm(full(poly2basis(delta_x)),inf);
 
      % evaluate first order KKT at current iterate
-      nabla_L = full(eval_gradLag( sol_x_it,lam_gs_it));
+      nabla_L(iter) = full(eval_gradLag( sol_x_it,lam_gs_it));
 
       inf_g   = full(eval_gradLag_inf_norm(sol_x_it,lam_gs_it));
     
+     % just for plotting
+     nabla_L_scaled(iter) = nabla_L(iter)*inf_delta_x/(max(1,abs(full(sol2.f)) + inf_g ));
+    
      % scaled termination criterion
-     if nabla_L < commonOpts.tolerance_opt*(max(1,abs(full(sol2.f)) + inf_g ))/inf_delta_x
+     if nabla_L(iter) <= commonOpts.tolerance_opt*(max(1,abs(full(sol2.f)) + inf_g ))/inf_delta_x
             break
      else
          % set current iterate to previous iterate
@@ -251,6 +259,8 @@ fprintf('-----------------------------------------------------------------------
 stats.iterations                = iter;
 stats.UNIFIED_RETURN_STATUS     = UNIFIED_RETURN_STATUS;
 stats.cost                      = cost_CD;
+stats.nabla_L                   = nabla_L;
+stats.nabla_L_scaled            = nabla_L_scaled;
 stats.initial_guess_trials      = initial_guess_trials;
 
 
@@ -259,9 +269,8 @@ stats.totalBuildTime = totalBuildTime;
 stats.solver1_stats  = S1.stats;
 stats.solver2_stats  = S2.stats;
 
-% store final solution
-sol.x.V = Vval;
-sol.x.s1 = s1val;
+% store final solution (same order as the sequential solver: [V;s1])
+sol.x = [Vval; s1val];
 
 solStruct.sol          = sol;
 solStruct.stats        = stats;

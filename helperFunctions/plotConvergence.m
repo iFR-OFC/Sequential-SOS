@@ -9,19 +9,22 @@ function [] = plotConvergence(problemStruct, ...
 figure('Name',[problemStruct.Name ' Benchmark run ' num2str(evalSequentialStruct.probNumber) ])
 tiledlayout(1,2)
 nexttile
-semilogy(abs(evalSequentialStruct.cost(2:end)-evalSequentialStruct.cost(1:end-1)),'LineWidth',1.2), grid on, title('Cost'), hold on,
+semilogy(evalSequentialStruct.scaled_d_ldx,'-*','LineWidth',1.2), grid on, title('Cost'), hold on,
 
 if enable_second_sequential
-    semilogy(abs(evalSequentialStruct_hessApprox2.cost(2:end)-evalSequentialStruct_hessApprox2.cost(1:end-1)),'LineWidth',1.2), hold on,
+    semilogy(evalSequentialStruct_hessApprox2eval.scaled_d_ldx,'-o','LineWidth',1.2), hold on,
 end
 
 % coordinate descent is optional (not implemented for every benchmark,
 % e.g. CBF-CLF); pass [] as solStruct_CD to skip its curve
 if ~isempty(solStruct_CD)
-    semilogy(abs(solStruct_CD.stats.cost(2:end)-solStruct_CD.stats.cost(1:end-1)),'LineWidth',1.2), hold on,
+    semilogy(solStruct_CD.stats.nabla_L_scaled,'-+','LineWidth',1.2), hold on,
 end
 xlabel('Iterations')
-ylabel('$ |f(\xi_{k+1}) - f(\xi_{k}) |$')
+ylabel(['$ \frac{\left\| \nabla_{L}(\xi^k,\lambda^k) \right\|_\infty \, \left\| \omega^k \right\|_\infty }' ...
+        '{\max\left(1,\left|f(\xi^k)\right|\right) + \left\|\langle \lambda^k, g(\xi^k)\rangle\right\|_\infty} $'], ...
+       'Interpreter','latex')
+
 legendLabels = {['Sequential' ' (' evalSequentialStruct.hess_est_method ')']};
 if enable_second_sequential
     legendLabels{end+1} = ['Sequential' ' (' evalSequentialStruct_hessApprox2.hess_est_method ')'];
@@ -30,6 +33,12 @@ if ~isempty(solStruct_CD)
     legendLabels{end+1} = 'Coordinate-descent';
 end
 legend(legendLabels{:})
+if enable_second_sequential
+    maxIter = max(evalSequentialStruct.iterations, evalSequentialStruct_hessApprox2.iterations, solStruct_CD.stats.iterations);
+else
+    maxIter = max(evalSequentialStruct.iterations,solStruct_CD.stats.iterations);
+end
+plot([0 maxIter],[evalSequentialStruct.options.tolerance_opt evalSequentialStruct.options.tolerance_opt],'k--','LineWidth',1.2)
 
 % constraint violation of sequential SOS
 % ------------------------------------------------------------------------
@@ -39,11 +48,11 @@ legend(legendLabels{:})
 % ------------------------------------------------------------------------
 nexttile
 
-if enable_second_sequential
-    maxIter = max(evalSequentialStruct.iterations, evalSequentialStruct_hessApprox2.iterations);
-else
-    maxIter = evalSequentialStruct.iterations;
-end
+% if enable_second_sequential
+%     maxIter = max(evalSequentialStruct.iterations, evalSequentialStruct_hessApprox2.iterations);
+% else
+%     maxIter = evalSequentialStruct.iterations;
+% end
 % plot tolerance for constraint satisfaction
 plot([0 maxIter],[evalSequentialStruct.options.tolerance_con evalSequentialStruct.options.tolerance_con],'k--','LineWidth',1.2)
 hold on

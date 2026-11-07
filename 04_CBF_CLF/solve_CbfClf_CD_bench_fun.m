@@ -26,11 +26,7 @@ l = 1e-6*(x'*x);
 %% setup solver
 startBuildTime = tic;
 
-% setup first solver (Prob 1): SOS multipliers, comparison rates and
-% control law
-% decision variables: [s1;s2;s3;s4;s5;gammaW;gammaV;kappa]
-% parameters:         [V;h;b]
-sos = struct('x',[s1;s2;s3;s4;s5;gammaW;gammaV;kappa],... % decision variables
+sos = struct('x',[s1;s2;s3;s4;s5;kappa],... % decision variables
     'p',[V;h;b]);    % parameter
 
 % SOS constraints
@@ -40,8 +36,6 @@ sos.('g') = [
     s3;
     s4;
     s5;
-    gammaW - 1e-6;
-    gammaV - 1e-6;
     s1*(h-b) - g;                                         % state constraints
     s2*(h-b) - nabla(h,x)*subs(f,u,kappa) - gammaW*(h-b); % CBF dissipation
     s3*(h-b) + kappa - umin;                              % control constraints
@@ -53,10 +47,9 @@ sos.('g') = [
 opts.Kx           = struct('lin', length(sos.x));
 opts.Kc           = struct('sos', length(sos.g));
 opts.newton_solver = [];
-% opts.sossol = commonOpts.solver;
-% opts.tolerance_abs = 1e-6;
-% opts.tolerance_rel = 1e-6;
+
 opts.error_on_fail = 0; % we do our own check in the main loop
+
 opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
 opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 
@@ -64,19 +57,17 @@ opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 S1 = casos.sossol('S1','mosek',sos,opts);
 
 
-% setup second solver (Prob 2): CLF, CBF and level set
-% decision variables: [V;h;b]
-% parameters:         [s1;s2;s3;s4;s5;gammaW;gammaV;kappa]
+% setup second solver
 cost = dot(g-(h-b),g-(h-b));
 
-sos = struct('x',[V;h;b],...            % decision variables
-    'f',cost,...                            % cost
-    'p',[s1;s2;s3;s4;s5;gammaW;gammaV;kappa]);  % parameter
+sos = struct('x',[V;h;b],...                    % decision variables
+    'f',cost,...                                % cost
+    'p',[s1;s2;s3;s4;s5;kappa]);  % parameter
 
 % SOS constraints
 sos.('g') = [
-    V - l;                                                  % CLF positivity
-    b - 1e-6;                                               % keep the level set positive
+    V - l;                                                % CLF positivity
+    b - 1e-6;                                             % keep the level set positive
     s1*(h-b) - g;                                         % state constraints
     s2*(h-b) - nabla(h,x)*subs(f,u,kappa) - gammaW*(h-b); % CBF dissipation
     s3*(h-b) + kappa - umin;                              % control constraints
@@ -89,12 +80,42 @@ opts      = struct;
 opts.Kx   = struct('lin', length(sos.x));
 opts.Kc   = struct('sos', length(sos.g));
 opts.newton_solver = [];
+
 opts.error_on_fail = 0; % we do our own check in the main loop
 opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
 opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 
 % solver for CLF, CBF and level set
 S2 = casos.sossol('S2',commonOpts.solver,sos,opts);
+
+% common constraints for Lagrangian (same order as sequential solver)
+g_common  = [s1;
+             s2;
+             s3;
+             s4;
+             s5;
+             V-l;
+             b - 1e-6;
+             s1*(h-b) - g;
+             s2*(h-b) - nabla(h,x)*subs(f,u,kappa) - gammaW*(h-b);
+             s3*(h-b) + kappa - umin;
+             s4*(h-b) + umax - kappa;
+             s5*(h-b) - nabla(V,x)*subs(f,u,kappa) - gammaV*V];
+
+% same order as initial guess for decision variables
+sos_x     = [V;h;s1;s2;s3;s4;s5;kappa;b];
+
+% get lagrange multiplier
+lam_gs    = casos.PS.sym('lam_gs', sparsity(g_common));
+
+% lagrangian
+lagrangian = casos.PS(cost + dot(lam_gs,g_common));
+
+% derivative lagrangian
+eval_gradLag  =  casos.Function('f',{sos_x,lam_gs}, { norm(jacobian( poly2basis(lagrangian), poly2basis(sos_x) ),inf) });
+
+% inf. norm of constraints (for scaled termination criterion)
+eval_gradLag_inf_norm  =  casos.Function('f',{sos_x,lam_gs}, { norm(poly2basis(casos.PS(dot(lam_gs,g_common))),inf) });
 
 totalBuildTime = toc(startBuildTime);
 
@@ -118,11 +139,23 @@ fprintf('-------------------------------------------------- \n')
 fprintf('Custom Coordinate Descent for CBF-CLF \n')
 fprintf('-------------------------------------------------- \n')
 
+% x_prev for termination criterion; take initial guess as first "previous"
+% iteration
+x_prev = x0;
+
+% fallback final solution (same order as the sequential solver) in case the
+% loop breaks before the first full iterate
+sol_x_it = x0;
 
 UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
 
 % number of initial-guess restarts needed until the problem became feasible
 initial_guess_trials = 1;
+
+% first-order KKT residual per iteration; stays inf if the loop breaks
+% before the first evaluation (e.g. a subsolver was infeasible)
+nabla_L        = inf;
+nabla_L_scaled = inf;
 
 %% V-h-b-s-iteration
 for iter = 1:maxIter
@@ -133,7 +166,8 @@ for iter = 1:maxIter
 
     sol1 = S1('p',sol2_x);
 
-    if strcmp(S1.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS')
+    s1_ok = strcmp(S1.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS');
+    if s1_ok
         sol1_x = sol1.x;
         UNIFIED_RETURN_STATUS = S1.stats.UNIFIED_RETURN_STATUS;
     else
@@ -166,7 +200,8 @@ for iter = 1:maxIter
 
     solvetime_all2(iter) = toc(S2start);
 
-    if strcmp(S2.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS')
+    s2_ok = strcmp(S2.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS');
+    if s2_ok
         % extract solution
         sol2_x = sol2.x;
     else
@@ -187,15 +222,52 @@ for iter = 1:maxIter
     % show progress
     fprintf('Iteration %d: f = %g\n',iter,full(sol2.f));
 
-    if ~isempty(fval_old)
-        if abs(full(sol2.f - fval_old)) <= commonOpts.tolerance_opt
-            break
-        else
-            fval_old = sol2.f;
-        end
+    if s2_ok
+    % lam of s1..s5 (s3,s4 are nu-vectors) from S1, rest from S2
+    if s1_ok
+        % in same order as constraints
+        lam_gs_it = [sol1.lam_g(1:length([s1;s2;s3;s4;s5]));sol2.lam_g];
     else
-        fval_old = sol2.f;
+        % in case S1 was infeasible, set multiplier to zero
+        lam_gs_it = [zeros(length([s1;s2;s3;s4;s5]),1);sol2.lam_g];
     end
+
+    % dec vars: V,h,b from S2; s1..s5,kappa from S1
+    sol_x_it  = [sol2.x(1);     % V from S2
+                 sol2.x(2);     % h from S2
+                 sol1_x;        % s1,s2,s3,s4,s5,kappa from S1
+                 sol2.x(end)];  % b from S2
+
+    % for scaled termination
+    delta_x     = sol_x_it - x_prev;
+    inf_delta_x = norm(full(poly2basis(delta_x)),inf);
+
+    % evaluate first order KKT at current iterate
+    nabla_L(iter) = full(eval_gradLag( sol_x_it,lam_gs_it));
+
+    inf_g   = full(eval_gradLag_inf_norm(sol_x_it,lam_gs_it));
+
+    % just for plotting
+    nabla_L_scaled(iter) = nabla_L(iter)*inf_delta_x/(max(1,abs(full(sol2.f)) + inf_g ));
+
+    % scaled termination criterion
+    if nabla_L(iter) <= commonOpts.tolerance_opt*(max(1,abs(full(sol2.f)) + inf_g ))/inf_delta_x
+        break
+    else
+        % set current iterate to previous iterate
+        x_prev =  sol_x_it;
+    end
+    end
+
+    % if ~isempty(fval_old)
+    %     if abs(full(sol2.f - fval_old)) <= commonOpts.tolerance_opt
+    %         break
+    %     else
+    %         fval_old = sol2.f;
+    %     end
+    % else
+    %     fval_old = sol2.f;
+    % end
 
 end % end for-loop (inner)
 
@@ -242,6 +314,8 @@ fprintf('-----------------------------------------------------------------------
 stats.iterations            = iter;
 stats.UNIFIED_RETURN_STATUS = UNIFIED_RETURN_STATUS;
 stats.cost                  = cost_CD;
+stats.nabla_L               = nabla_L;
+stats.nabla_L_scaled        = nabla_L_scaled;
 stats.initial_guess_trials  = initial_guess_trials;
 
 stats.totalSolveTime = totalSolveTime;
@@ -249,18 +323,9 @@ stats.totalBuildTime = totalBuildTime;
 stats.solver1_stats  = S1.stats;
 stats.solver2_stats  = S2.stats;
 
-% store final solution
-sol.x.V      = sol2_x(1);
-sol.x.h      = sol2_x(2);
-sol.x.b      = -sol1.f;
-sol.x.s1     = sol1_x(1);
-sol.x.s2     = sol1_x(2);
-sol.x.s3     = sol1_x(3:5);
-sol.x.s4     = sol1_x(6:8);
-sol.x.s5     = sol1_x(9);
-sol.x.gammaW = sol1_x(10);
-sol.x.gammaV = sol1_x(11);
-sol.x.kappa  = sol1_x(12:14);
+% store final solution (same order as the sequential solver's decision
+% variables, cf. sol_x_it in the main loop)
+sol.x = sol_x_it;
 
 solStruct.sol          = sol;
 solStruct.stats        = stats;

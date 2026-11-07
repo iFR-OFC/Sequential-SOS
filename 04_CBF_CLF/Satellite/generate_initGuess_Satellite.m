@@ -39,11 +39,11 @@ kappa0 = -K*x;                    % LQR control law
 
 b0 = 0.8;                         % level set of the terminal set
 
-gammaW0 = 0.01;
-gammaV0 = 0.01;
+% gammaW0 = 0.01;
+% gammaV0 = 0.01;
 
 
 % initial guess for sequential / coordinate descent
-x0 = casos.PD([V0; h0; s10; s20; s30; s40; s50; kappa0; gammaW0; gammaV0;b0]);
+x0 = casos.PD([V0; h0; s10; s20; s30; s40; s50; kappa0;b0]);
 
 end

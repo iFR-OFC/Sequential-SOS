@@ -40,7 +40,6 @@ s6 = casos.PS.sym('s6',monomials([x;t],0:2),[length(u) 1]);
 s7 = casos.PS.sym('s7',monomials([x;t],0:2));
 s8 = casos.PS.sym('s8',monomials([x;t],0:2));
 s9 = casos.PS.sym('s9',monomials(x,0:2));
-s10 = casos.PS.sym('s10',monomials(x,0:2));
 
 % Time horizon
 T  = 1;
@@ -71,7 +70,6 @@ probStruct.s6   = s6;
 probStruct.s7   = s7;
 probStruct.s8   = s8;
 probStruct.s9   = s9;
-probStruct.s10  = s10;
 
 
 probStruct.b    = b;  % level set

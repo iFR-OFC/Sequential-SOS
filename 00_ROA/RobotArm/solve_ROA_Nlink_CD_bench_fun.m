@@ -56,8 +56,10 @@ opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 S1 = casos.sossol('S1',commonOpts.solver ,sos1,opts);
 
 % solver 2: V-step
+cost = dot(g-V,g-V);            % squared distance of V to the safe set (no level-set shift)
+
 sos2 = struct('x',V, ...        % dec.var
-    'f',dot(g-V,g-V),...        % squared distance of V to the safe set (no level-set shift)
+    'f',cost,...                % cost
     'p',s1);                % parameter
 
 % constraints
@@ -75,6 +77,26 @@ opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 % build third solver
 S2 = casos.sossol('S',commonOpts.solver ,sos2,opts);
 
+% common constraints for Lagrangian
+g_common  = [s1;
+             V-l;
+             s1*(V-b0)-nabla(V,x)*f-l];
+
+% same order as initial guess for decision variables
+sos_x     = [V;s1];
+
+% get lagrange multiplier (sparsity)
+lam_gs    = casos.PS.sym('lam_gs', sparsity(g_common));
+
+% lagrangian
+lagrangian = casos.PS(cost + dot(lam_gs,g_common));
+
+% derivative lagrangian
+eval_gradLag  =  casos.Function('f',{sos_x,lam_gs}, { norm(jacobian( poly2basis(lagrangian), poly2basis(sos_x) ),inf) });
+
+% inf. norm of constraints (for scaled termination criterion)
+eval_gradLag_inf_norm  =  casos.Function('f',{sos_x,lam_gs}, { norm(poly2basis(casos.PS(dot(lam_gs,g_common))),inf) });
+
 totalBuildTime = toc(buildTimes_start);
 
 %% Initial guess Lyapunov function
@@ -91,6 +113,10 @@ fprintf('-------------------------------------------------- \n')
 fprintf('Custom Coordinate Descent for Region-of-Attraction \n')
 fprintf('-------------------------------------------------- \n')
 
+% x_prev for termination criterion; take initial guess as first "previous"
+% iteration
+x_prev = x0;
+
 
 
 UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
@@ -98,6 +124,11 @@ UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
 % number of initial-guess restarts needed until the problem became feasible
 % (0: first guess feasible, 1: second starter needed, 2: third starter needed)
 initial_guess_trials = 0;
+
+% first-order KKT residual per iteration; stays inf if the loop breaks
+% before the first evaluation (e.g. a subsolver was infeasible)
+nabla_L        = inf;
+nabla_L_scaled = inf;
 
 %% V-s-iteration
 for iter = 1:maxIter
@@ -107,7 +138,8 @@ for iter = 1:maxIter
 
         sol1 = S1('p',Vval);
 
-        if strcmp(S1.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS')
+        s1_ok = strcmp(S1.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS');
+        if s1_ok
             s1val  = sol1.x;
             % old_UNIFIED_RETURN_STATUS1 = S1.stats.UNIFIED_RETURN_STATUS;
         else
@@ -160,17 +192,47 @@ for iter = 1:maxIter
 
     % show progress
     fprintf('Iteration %d: f = %g\n',iter,full(sol2.f));
+        
+      % extract lagrange multiplier from each subproblem
+     if s1_ok
+         lam_gs_it = [sol1.lam_g(1);sol2.lam_g];
+     else
+         lam_gs_it = [0;sol2.lam_g];
+     end
 
+     % get complete solution vector, i.e, same order 
+     sol_x_it  = [sol2.x;sol1.x];
+    
+     % for scaled termination
+     delta_x = sol_x_it - x_prev;
+     inf_delta_x = norm(full(poly2basis(delta_x)),inf);
 
-    if ~isempty(fval_old)
-        if abs(full(sol2.f - fval_old)) <= commonOpts.tolerance_opt
+     % evaluate first order KKT at current iterate
+      nabla_L(iter) = full(eval_gradLag( sol_x_it,lam_gs_it));
+
+      inf_g   = full(eval_gradLag_inf_norm(sol_x_it,lam_gs_it));
+    
+     % just for plotting
+     nabla_L_scaled(iter) = nabla_L(iter)*inf_delta_x/(max(1,abs(full(sol2.f)) + inf_g ));
+    
+     % scaled termination criterion
+     if nabla_L(iter) <= commonOpts.tolerance_opt*(max(1,abs(full(sol2.f)) + inf_g ))/inf_delta_x
             break
-        else
-            fval_old = sol2.f;
-        end
-    else
-        fval_old = sol2.f;
-    end
+     else
+         % set current iterate to previous iterate
+         x_prev =  sol_x_it;
+     end
+
+
+    % if ~isempty(fval_old)
+    %     if abs(full(sol2.f - fval_old)) <= commonOpts.tolerance_opt
+    %         break
+    %     else
+    %         fval_old = sol2.f;
+    %     end
+    % else
+    %     fval_old = sol2.f;
+    % end
 
 
 
@@ -221,6 +283,8 @@ fprintf('-----------------------------------------------------------------------
 stats.iterations     = iter;
 stats.UNIFIED_RETURN_STATUS        = UNIFIED_RETURN_STATUS;
 stats.cost           = cost_CD;
+stats.nabla_L        = nabla_L;
+stats.nabla_L_scaled = nabla_L_scaled;
 stats.initial_guess_trials = initial_guess_trials;
 
 if strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && iter < maxIter
@@ -235,9 +299,8 @@ stats.totalBuildTime = totalBuildTime;
 stats.solver1_stats  = S1.stats;
 stats.solver2_stats  = S2.stats;
 
-% store final solution
-sol.x.V = Vval;
-sol.x.s1 = s1val;
+% store final solution (same order as the sequential solver: [V;s1])
+sol.x = [Vval; s1val];
 
 solStruct.sol          = sol;
 solStruct.stats        = stats;

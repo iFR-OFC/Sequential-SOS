@@ -35,7 +35,7 @@ opts.hessian_approx                            = hess_est_method;
 cost = dot(g-(h-b),g-(h-b)) ;
 
 % decision variables (sorted: V,h,s1,s2,s3,s4,s5,kappa,b,gammaW,gammaV)
-sos = struct('x',[V;h;s1;s2;s3;s4;s5;kappa;gammaW;gammaV;b],...
+sos = struct('x',[V;h;s1;s2;s3;s4;s5;kappa;b],...
     'f',cost, ...                   % cost
     'p',[]);                        % parameter
 
@@ -46,8 +46,6 @@ sos.('g') = [
             s3;
             s4;
             s5;
-            gammaW - 1e-6;
-            gammaV - 1e-6;
             V - 1e-6*(x'*x);                                      % CLF positivity
             b - 1e-6;                                             % keep the level set positive
             s1*(h-b) - g;                                         % state constraints

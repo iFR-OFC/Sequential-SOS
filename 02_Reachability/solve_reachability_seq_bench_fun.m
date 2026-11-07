@@ -16,7 +16,6 @@ s6 = probStruct.s6;
 s7 = probStruct.s7;
 s8 = probStruct.s8;
 s9 = probStruct.s9;
-s10 = probStruct.s10;
 gT  = probStruct.gT ;
 T = probStruct.T;
 
@@ -42,7 +41,7 @@ opts.hessian_approx               = hess_est_method;
 % cost
 cost = dot( g-(subs(V,t,0)-b), g-(subs(V,t,0)-b) ) ;
 
-sos = struct('x',[V;  kappa; s1; s2; s3; s4; s5; s6;s7;s8;s9;s10;b],...
+sos = struct('x',[V;  kappa; s1; s2; s3; s4; s5; s6;s7;s8;s9;b],...
               'f', cost, ...
               'p',[]);
 
@@ -57,13 +56,12 @@ sos.('g') = [s1;
              s7;
              s8;
              s9;
-             s10;
+             b - 1e-6;
              s1*(V-b) - s2*hT - nabla(V,t) - nabla(V,x)*subs(f,u,kappa);
              s3*(V-b) - s4*hT + kappa - umin;
              s5*(V-b) - s6*hT + umax - kappa;
              s7*(V-b) - s8*hT - g; 
              s9*(subs(V,t,T)-b)    - gT ;
-             s10*gT   - subs(V,t,0) + b; 
              ];
 
 % states + constraint cones
