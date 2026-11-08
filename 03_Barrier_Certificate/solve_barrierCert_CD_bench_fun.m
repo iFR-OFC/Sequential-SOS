@@ -43,8 +43,17 @@ opts.Kx           = struct('lin', length(sos.x));
 opts.Kc           = struct('sos', length(sos.g));
 opts.newton_solver = [];
 opts.error_on_fail = 0; % we do our own check in the main loop
+if  strcmpi(commonOpts.solver,'mosek')
 opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
 opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+
+elseif strcmpi(commonOpts.solver,'clarabel')
+opts.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
+
+elseif strcmpi(commonOpts.solver,'scs')
+    opts.sdpsol_options.scs = commonOpts.sdp_solver_opts;
+
+end
 
 % solver for multiplier
 S1 = casos.sossol('S1',commonOpts.solver,sos,opts);
@@ -72,8 +81,17 @@ opts.Kx   = struct('lin', length(sos.x));
 opts.Kc   = struct('sos', length(sos.g));
 opts.newton_solver = [];
 opts.error_on_fail = 0; % we do our own check in the main loop
+if  strcmpi(commonOpts.solver,'mosek')
 opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
 opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+
+elseif strcmpi(commonOpts.solver,'clarabel')
+opts.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
+
+elseif strcmpi(commonOpts.solver,'scs')
+    opts.sdpsol_options.scs = commonOpts.sdp_solver_opts;
+
+end
 
 % setup solver: solveLyapunov function
 S2 = casos.sossol('S2',commonOpts.solver,sos,opts);
@@ -117,7 +135,7 @@ sol2_x = [x0(1);
           x0(end)];
 
 fprintf('-------------------------------------------------- \n')
-fprintf('Custom Coordinate Descent for Control Design \n')
+fprintf('Custom Coordinate Descent for Barrier Certificate \n')
 fprintf('-------------------------------------------------- \n')
 
 % x_prev for termination criterion; take initial guess as first "previous"
@@ -176,8 +194,11 @@ for iter = 1:maxIter
         opts.sossol = 'mosek';
         opts.error_on_fail = 0;
         opts.sossol_options.newton_solver =[];
+        % bisection fallback uses mosek: pass its params only if configured
+        if isfield(commonOpts.sdp_solver_opts,'mosek_param')
         opts.sossol_options.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
         opts.sossol_options.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+        end
 
         % build first solver
 

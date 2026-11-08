@@ -49,8 +49,17 @@ opts.Kx = struct('lin', 1);
 opts.Kc = struct('sos', 2);
 opts.newton_solver =[];
 opts.error_on_fail = 0; % we do our own check in the main loop
+if  strcmpi(commonOpts.solver,'mosek')
 opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
 opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+
+elseif strcmpi(commonOpts.solver,'clarabel')
+opts.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
+
+elseif strcmpi(commonOpts.solver,'scs')
+    opts.sdpsol_options.scs = commonOpts.sdp_solver_opts;
+
+end
 
 % build first solver
 S1 = casos.sossol('S1',commonOpts.solver ,sos1,opts);
@@ -71,8 +80,17 @@ opts.Kx = struct('sos', 0, 'lin', 1);
 opts.Kc = struct('sos', 2);
 opts.newton_solver =[];
 opts.error_on_fail = 0; % we do our own check in the main loop
+if  strcmpi(commonOpts.solver,'mosek')
 opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
 opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+
+elseif strcmpi(commonOpts.solver,'clarabel')
+opts.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
+
+elseif strcmpi(commonOpts.solver,'scs')
+    opts.sdpsol_options.scs = commonOpts.sdp_solver_opts;
+
+end
 
 % build third solver
 S2 = casos.sossol('S',commonOpts.solver ,sos2,opts);

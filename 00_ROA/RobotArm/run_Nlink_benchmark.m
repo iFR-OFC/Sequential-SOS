@@ -63,15 +63,22 @@ commonOpts.miniter       = 5; % minimum iterations before an aborted CD run stil
 
 % MOSEK settings
 
-
-commonOpts.sdp_solver_opts.mosek_param = struct( ...
-    'MSK_IPAR_NUM_THREADS',            1);
-
-commonOpts.sdp_solver_opts.mosek_echo = 0;
+if strcmpi(commonOpts.solver,'mosek')
+    commonOpts.sdp_solver_opts.mosek_param = struct( ...
+        'MSK_IPAR_NUM_THREADS',            1); 
+    commonOpts.sdp_solver_opts.mosek_echo = 0;
     % 'MSK_DPAR_INTPNT_CO_TOL_PFEAS',    1e-7, ...
     % 'MSK_DPAR_INTPNT_CO_TOL_DFEAS',    1e-7, ...
     % 'MSK_DPAR_INTPNT_CO_TOL_REL_GAP',  1e-7, ...
     % 'MSK_DPAR_INTPNT_CO_TOL_MU_RED',   1e-7);
+
+elseif strcmpi(commonOpts.solver,'clarabel')
+        commonOpts.sdp_solver_opts.direct_solve_method =  'FAER';
+        commonOpts.sdp_solver_opts.verbose             = 0;
+elseif strcmpi(commonOpts.solver,'scs')
+    commonOpts.sdp_solver_opts.dense               = 1;
+    commonOpts.sdp_solver_opts.verbose             = 0;
+end
 
 % only degree 2 to keep computational effort reasonable for larger number
 % of states

@@ -26,8 +26,17 @@ opts                                           = struct('sossol',commonOpts.solv
 opts.max_iter                                  = commonOpts.maxiter;
 opts.con_vio_check                             = 'signed-distance';
 opts.sossol_options.newton_solver              = [];
+if  strcmpi(commonOpts.solver,'mosek')
 opts.sossol_options.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
 opts.sossol_options.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+
+elseif strcmpi(commonOpts.solver,'clarabel')
+opts.sossol_options.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
+
+elseif strcmpi(commonOpts.solver,'scs')
+    opts.sossol_options.sdpsol_options.scs = commonOpts.sdp_solver_opts;
+
+end
 opts.hessian_approx                            = hess_est_method;
 
 
@@ -59,6 +68,7 @@ sos.('g') = [
 opts.Kx      = struct('lin', length(sos.x));
 opts.Kc      = struct('sos', length(sos.g));
 opts.sossol_options.newton_solver =[];
+opts.tolerance_opt = commonOpts.tolerance_opt;
 
 % setup solver
 S = casos.nlsossol('S1','sequential',sos,opts);

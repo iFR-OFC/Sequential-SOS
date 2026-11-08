@@ -50,11 +50,20 @@ opts.newton_solver = [];
 
 opts.error_on_fail = 0; % we do our own check in the main loop
 
+if  strcmpi(commonOpts.solver,'mosek')
 opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
 opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 
+elseif strcmpi(commonOpts.solver,'clarabel')
+opts.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
+
+elseif strcmpi(commonOpts.solver,'scs')
+    opts.sdpsol_options.scs = commonOpts.sdp_solver_opts;
+
+end
+
 % solver for multipliers, gammas and control law
-S1 = casos.sossol('S1','mosek',sos,opts);
+S1 = casos.sossol('S1',commonOpts.solver,sos,opts);
 
 
 % setup second solver
@@ -82,8 +91,17 @@ opts.Kc   = struct('sos', length(sos.g));
 opts.newton_solver = [];
 
 opts.error_on_fail = 0; % we do our own check in the main loop
+if  strcmpi(commonOpts.solver,'mosek')
 opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
 opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+
+elseif strcmpi(commonOpts.solver,'clarabel')
+opts.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
+
+elseif strcmpi(commonOpts.solver,'scs')
+    opts.sdpsol_options.scs = commonOpts.sdp_solver_opts;
+
+end
 
 % solver for CLF, CBF and level set
 S2 = casos.sossol('S2',commonOpts.solver,sos,opts);
