@@ -36,31 +36,31 @@ clc
 maxNumCompThreads(1);
 
 % add the problem specific folders and the shared helper functions
-runnerDir = fileparts(mfilename('fullpath'));
+runnerDir = pwd;
 addPaths  = { ...
     fullfile(runnerDir,'VDP'), ...
     fullfile(runnerDir,'MultiInput'), ...
     fullfile(runnerDir,'DoublePendulum'), ...
     fullfile(runnerDir,'Aircraft'), ...
-    fullfile(runnerDir,'LotkaVoltera'), ...
     fullfile(runnerDir,'Satellite_Att'), ...
     fullfile(runnerDir,'F18'), ...
     fullfile(runnerDir,'Network'), ...
     fullfile(runnerDir,'..','helperFunctions')};
+
 for ii = 1:numel(addPaths)
     addpath(addPaths{ii})
 end
 
 % enable plotting of convergence for each run
 enable_plot_convergence  = true;
-enable_second_sequential = true;
+enable_second_sequential = false;
 
 % Hessian estimation methods of the sequential solver to compare
 hess_est_method_1 = 'regularization'; % our default (see also sequentialCommon.m)
-hess_est_method_2 = 'levenberg';           % 'BFGS', 'levenberg', 'mirroring'
+hess_est_method_2 = 'BFGS';           % 'BFGS', 'levenberg', 'mirroring'
 
 % common options shared by the methods
-commonOpts.maxiter       = 350;
+commonOpts.maxiter       = 500;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
 commonOpts.solver        = 'mosek';
@@ -362,8 +362,8 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 
 % define the problem instances based on different polynomial degrees
-degV = {2,2:4,1:4};
-degS = {2:4,2:4,2:4};
+degV = {2,   2, 2:4, 1:4};
+degS = {2, 2:4, 2:4, 2:4};
 
 for kk = 1:numel(degV)
 
@@ -440,83 +440,13 @@ end
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
-% %% LotkaVol
-% 
-% % define the problem instances based on different polynomial degrees
-% degV = {2,2:4,1:4};
-% degS = {2,2:4,2:4};
-% 
-% for kk = 1:numel(degV)
-% 
-%     % generate problem structure (dynamics, polynomial dec. variables)
-%     probStruct_LotkaVol = generateLotkaVol_probStruct(degV{kk},degS{kk});
-%     fprintf('------------------------------------------------------------------------------------------ \n')
-%     fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_LotkaVol.Name, kk, numel(degV))
-%     fprintf('------------------------------------------------------------------------------------------\n')
-% 
-%     % generate an initial guess
-%     x0 = generate_initGuess_LotkaVol(probStruct_LotkaVol);
-% 
-%     % solve LotkaVol example with two states using sequential SOS
-%     hess_est_method = hess_est_method_1;
-%     solStruct_seq_LotkaVol_regularization = solve_ROA_seq_bench_fun(probStruct_LotkaVol,commonOpts,x0,hess_est_method);
-% 
-%     seqSolverStructs_regularization{end+1} = solStruct_seq_LotkaVol_regularization;
-% 
-%     % extract size and timing statistic from sequential
-%     evalSequentialStruct_LotkaVol_regularization = evalSequential(solStruct_seq_LotkaVol_regularization);
-%     evalSequentialStruct_LotkaVol_regularization.hess_est_method = hess_est_method_1;
-%     evalSequentialStruct_LotkaVol_regularization.probNumber = kk;
-% 
-%     if enable_second_sequential
-% 
-%         hess_est_method = hess_est_method_2;
-%         solStruct_seq_LotkaVol_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_LotkaVol,commonOpts,x0,hess_est_method);
-% 
-%         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_LotkaVol_hessApprox2;
-% 
-%         % extract size and timing statistic from sequential
-%         evalSequentialStruct_LotkaVol_hessApprox2 = evalSequential(solStruct_seq_LotkaVol_hessApprox2);
-%         evalSequentialStruct_LotkaVol_hessApprox2.hess_est_method = hess_est_method_2;
-%         evalSequentialStruct_LotkaVol_hessApprox2.probNumber = kk;
-%     end
-% 
-%     % solve LotkaVol example with two states using custom coordinate-descent
-%     solStruct_CD_LotkaVol = solve_ROA_CD_bench_fun(probStruct_LotkaVol,commonOpts,x0);
-% 
-%     cdSolverStructs{end+1} = solStruct_CD_LotkaVol;
-% 
-%     % Generate table
-% 
-%     % append the current run to the accumulating results table
-%     if enable_second_sequential
-%         tableRows = appendResultRow(tableRows,probStruct_LotkaVol,solStruct_CD_LotkaVol, ...
-%             solStruct_seq_LotkaVol_regularization,solStruct_seq_LotkaVol_hessApprox2);
-%     else
-%         tableRows = appendResultRow(tableRows,probStruct_LotkaVol,solStruct_CD_LotkaVol, ...
-%             solStruct_seq_LotkaVol_regularization);
-%     end
-% 
-%     if enable_plot_convergence
-%         % Evaluate
-%         plotConvergence(probStruct_LotkaVol, ...
-%             enable_second_sequential,...
-%             evalSequentialStruct_LotkaVol_regularization,...
-%             evalSequentialStruct_LotkaVol_hessApprox2,...
-%             solStruct_CD_LotkaVol)
-%     end
-% 
-% end
-% 
-% % display the results table accumulated over all runs so far
-% disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 
 %% Satellite
 
 % define the problem instances based on different polynomial degrees
-degV = {2,2:4,2:6};
-degS = {2,2,2:4};
+degV = {2, 2:4, 2:4};
+degS = {2,   2, 2:4};
 
 
 for kk = 1:numel(degV)
@@ -599,8 +529,8 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 %% F/A-18
 
 % define the problem instances based on different polynomial degrees
-degV = {2, 2:4, 2:4};
-degS = {2,   2, 2:4};
+degV = {2, 2:4};
+degS = {2,   2};
 
 for kk = 1:numel(degV)
 

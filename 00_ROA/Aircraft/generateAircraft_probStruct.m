@@ -28,7 +28,7 @@ probStruct.f    = f;        % dynamics
 probStruct.g    = g;        % safe set
 probStruct.s1   = s1;       % multiplier
 probStruct.V    = V;        % Lyapunov function
-probStruct.b    = 1;        % constant stable level set
+probStruct.b    = 2;        % constant stable level set
 probStruct.Name = 'Aircraft'; % Name of example
 
 end

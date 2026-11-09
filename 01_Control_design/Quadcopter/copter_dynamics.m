@@ -23,7 +23,10 @@ xdot = [x(3);
 
 
 
-% we need to shift the dynamics 
-% u0 = 
+% we need to shift the dynamics "into" the equilibrium
+u0 = [gn/K0;0];
+x0 = zeros(6,1);
+
+xdot = subs(xdot,[x;u],[x+x0;u+u0]);
 
 end

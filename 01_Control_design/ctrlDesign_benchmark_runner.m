@@ -45,18 +45,18 @@ for ii = 1:numel(addPaths)
 end
 
 % enable plotting of convergence for each run
-enable_plot_convergence  = false;
-enable_second_sequential = false;
+enable_plot_convergence  = true;
+enable_second_sequential = true;
 
 % Hessian estimation methods of the sequential solver to compare
 hess_est_method_1 = 'regularization'; % our default (see also sequentialCommon.m)
-hess_est_method_2 = 'mirroring';      % 'BFGS', 'levenberg', 'mirroring'
+hess_est_method_2 =  'levenberg';      % 'BFGS', 'levenberg', 'mirroring'
 
 % common options shared by the methods
 commonOpts.maxiter       = 100;
 commonOpts.tolerance_opt = 1e-3;
 commonOpts.maxSolveTime  = 3600;
-commonOpts.solver        = 'clarabel';
+commonOpts.solver        = 'mosek';
 commonOpts.miniter       = 5; % minimum iterations before an aborted CD run still counts as successful
 
 % MOSEK settings
@@ -425,11 +425,11 @@ end
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 
-% %% Copter
+%% Copter
 % 
 % % define the problem instances based on different polynomial degrees
 % degV = {2  , 2:4, 1:4};
-% degK = {1:2, 1:2, 1:2};
+% degK = {1, 1:2, 1:2};
 % 
 % 
 % for kk = 1:numel(degV)
@@ -492,9 +492,9 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 %             solStruct_CD_Copter)
 %     end
 % end
-% 
-% % display the results table accumulated over all runs so far
-% disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 
 %% Satellite

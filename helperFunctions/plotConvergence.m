@@ -9,16 +9,16 @@ function [] = plotConvergence(problemStruct, ...
 figure('Name',[problemStruct.Name ' Benchmark run ' num2str(evalSequentialStruct.probNumber) ])
 tiledlayout(1,2)
 nexttile
-semilogy(evalSequentialStruct.scaled_d_ldx,'-*','LineWidth',1.2), grid on, title('Cost'), hold on,
+semilogy(0:evalSequentialStruct.iterations,evalSequentialStruct.scaled_d_ldx,'-*','LineWidth',1.2), grid on, title('Cost'), hold on,
 
 if enable_second_sequential
-    semilogy(evalSequentialStruct_hessApprox2eval.scaled_d_ldx,'-o','LineWidth',1.2), hold on,
+    semilogy(0:evalSequentialStruct_hessApprox2.iterations,evalSequentialStruct_hessApprox2.scaled_d_ldx,'-o','LineWidth',1.2), hold on,
 end
 
 % coordinate descent is optional (not implemented for every benchmark,
 % e.g. CBF-CLF); pass [] as solStruct_CD to skip its curve
 if ~isempty(solStruct_CD)
-    semilogy(solStruct_CD.stats.nabla_L_scaled,'-+','LineWidth',1.2), hold on,
+    semilogy(0:solStruct_CD.stats.iterations,solStruct_CD.stats.nabla_L_scaled,'-+','LineWidth',1.2), hold on,
 end
 xlabel('Iterations')
 ylabel(['$ \frac{\left\| \nabla_{L}(\xi^k,\lambda^k) \right\|_\infty \, \left\| \omega^k \right\|_\infty }' ...
@@ -34,7 +34,7 @@ if ~isempty(solStruct_CD)
 end
 legend(legendLabels{:})
 if enable_second_sequential
-    maxIter = max(evalSequentialStruct.iterations, evalSequentialStruct_hessApprox2.iterations, solStruct_CD.stats.iterations);
+    maxIter = max([evalSequentialStruct.iterations, evalSequentialStruct_hessApprox2.iterations, solStruct_CD.stats.iterations]);
 else
     maxIter = max(evalSequentialStruct.iterations,solStruct_CD.stats.iterations);
 end
@@ -72,9 +72,9 @@ xlabel('Iterations')
 ylabel('$\min(\mathrm{eps},\theta(\xi_{k}))$')
 
 if enable_second_sequential
-legend({['Sequential' ' (' evalSequentialStruct.hess_est_method ')'],['Sequential'  ' (' evalSequentialStruct_hessApprox2.hess_est_method ')'],'$\epsilon_\mathrm{con}$','eps'})
+legend({'$\epsilon_\mathrm{con}$','eps',['Sequential' ' (' evalSequentialStruct.hess_est_method ')'],['Sequential'  ' (' evalSequentialStruct_hessApprox2.hess_est_method ')']})
 else
-    legend({['Sequential' '(' evalSequentialStruct.hess_est_method ')'],'$\epsilon_\mathrm{con}$','eps'})
+    legend({'$\epsilon_\mathrm{con}$','eps',['Sequential' '(' evalSequentialStruct.hess_est_method ')']})
 end
 
 

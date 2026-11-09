@@ -135,6 +135,10 @@ eval_gradLag  =  casos.Function('f',{sos_x,lam_gs}, { norm(jacobian( poly2basis(
 % inf. norm of constraints (for scaled termination criterion)
 eval_gradLag_inf_norm  =  casos.Function('f',{sos_x,lam_gs}, { norm(poly2basis(casos.PS(dot(lam_gs,g_common))),inf) });
 
+% cost function of the V-step (needed to evaluate the cost at the zeroth
+% iterate/initial guess, cf. SequentialCommon: eval_cost of full(nlsos.f))
+eval_cost = casos.Function('f',{sos_x}, { cost });
+
 totalBuildTime = toc(startBuildTime);
 
 
@@ -170,13 +174,32 @@ UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
 % number of initial-guess restarts needed until the problem became feasible
 initial_guess_trials = 1;
 
-% first-order KKT residual per iteration; stays inf if the loop breaks
-% before the first evaluation (e.g. a subsolver was infeasible)
+% first-order KKT residual per iteration; entries beyond the last completed
+% iteration stay inf (e.g. if a subsolver was infeasible)
 nabla_L        = inf;
 nabla_L_scaled = inf;
 
+% no subsolver time at the zeroth iterate
+solvetime_all1(1) = 0;
+solvetime_all2(1) = 0;
+
+% zeroth iterate (initial guess)
+cost_CD(1) = full(eval_cost(x0));
+fprintf('Iteration %d: f = %g\n',0,cost_CD(1));
+
+% no multipliers available at the initial guess -> use zeros (cf. sequential)
+lam_gs_0 = zeros(numel(lam_gs),1);
+
+% no previous iterate at the zeroth iterate (x_prev = x0)
+inf_delta_x_0 = norm(full(poly2basis(x_prev)),inf);
+
+nabla_L(1)        = full(eval_gradLag(x0,lam_gs_0));
+inf_g_0           = full(eval_gradLag_inf_norm(x0,lam_gs_0));
+nabla_L_scaled(1) = nabla_L(1)*inf_delta_x_0/(max(1,abs(cost_CD(1)) + inf_g_0));
+
 %% V-h-b-s-iteration
-for iter = 1:maxIter
+% real k-th iteration runs at iter = k+1 (cf. sequential)
+for iter = 2:maxIter+1
 
 
     %% s-step (Prob 1)
@@ -191,16 +214,16 @@ for iter = 1:maxIter
     else
         % if we just made a few iterations and become infeasible we
         % assume the initial guess is bad
-        if iter <= 1
+        if iter <= 2
 
             sol1_x = sol1_x0;
 
             initial_guess_trials = 2;
 
-            fprintf('Infeasible in solver 1 in iteration %d. We provide another initial guess. \n',iter)
+            fprintf('Infeasible in solver 1 in iteration %d. We provide another initial guess. \n',iter-1)
 
         else
-            fprintf('Infeasible in solver 1 in iteration %d; retaining previous iterate\n', iter);
+            fprintf('Infeasible in solver 1 in iteration %d; retaining previous iterate\n', iter-1);
             UNIFIED_RETURN_STATUS = S1.stats.UNIFIED_RETURN_STATUS;
             break
         end
@@ -223,22 +246,22 @@ for iter = 1:maxIter
         % extract solution
         sol2_x = sol2.x;
     else
-        if iter <= 1
-            fprintf('Infeasible in solver 2 in iteration %d. We try another initial guess! \n',iter)
+        if iter <= 2
+            fprintf('Infeasible in solver 2 in iteration %d. We try another initial guess! \n',iter-1)
             UNIFIED_RETURN_STATUS = S2.stats.UNIFIED_RETURN_STATUS;
             sol2_x = [x0(1);
                       x0(2)
                       x0(end)];
             initial_guess_trials = 3;
         else
-            fprintf('Infeasible in solver 2 in iteration %d; retaining previous iterate\n', iter);
+            fprintf('Infeasible in solver 2 in iteration %d; retaining previous iterate\n', iter-1);
             UNIFIED_RETURN_STATUS = S2.stats.UNIFIED_RETURN_STATUS;
             break
         end
     end
 
     % show progress
-    fprintf('Iteration %d: f = %g\n',iter,full(sol2.f));
+    fprintf('Iteration %d: f = %g\n',iter-1,full(sol2.f));
 
     if s2_ok
     % lam of s1..s5 (s3,s4 are nu-vectors) from S1, rest from S2
@@ -291,8 +314,12 @@ end % end for-loop (inner)
 
 totalSolveTime = sum(solvetime_all1) + sum(solvetime_all2);
 
+% number of real CD iterations; the zeroth iterate (initial guess) is stored
+% at index 1 and is not counted (cf. sequential solver: stats.iterations = iter-1)
+numIter = iter - 1;
 
-if iter == maxIter
+
+if iter == maxIter+1
     UNIFIED_RETURN_STATUS = 'RET_LIMITED';
 end
 
@@ -306,8 +333,8 @@ end
 % infeasible after a minimum number of iterations (cf. commonOpts.miniter)
 % and the cost function made some progress over these iterations;
 % otherwise the run is marked as RET_LIMITED
-if ~strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && iter < maxIter
-    if iter >= commonOpts.miniter && abs(cost_CD(1) - cost_CD(end)) > commonOpts.tolerance_opt
+if ~strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && iter <= maxIter
+    if numIter >= commonOpts.miniter && abs(cost_CD(1) - cost_CD(end)) > commonOpts.tolerance_opt
         UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
     else
         UNIFIED_RETURN_STATUS = 'RET_LIMITED';
@@ -319,7 +346,7 @@ end
 fprintf('------------------------------------------------------------------------------------------ \n')
 if strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS')
     fprintf('Solution status: Optimal solution found\n')
-elseif iter == maxIter
+elseif iter == maxIter+1
     fprintf('Solution status: Maximum number of iterations reached\n')
 else
     fprintf('Solution status: Problem infeasible.\n')
@@ -329,7 +356,13 @@ fprintf('Build time: %.4f s\n',totalBuildTime)
 fprintf('Total time: %.4f s\n',totalBuildTime+totalSolveTime)
 fprintf('------------------------------------------------------------------------------------------ \n')
 
-stats.iterations            = iter;
+% pad diagnostic arrays to numIter+1 entries (index 1 = zeroth iterate) so
+% that they line up with 0:stats.iterations in the convergence plots
+cost_CD(end+1:numIter+1)        = cost_CD(end);
+nabla_L(end+1:numIter+1)        = inf;
+nabla_L_scaled(end+1:numIter+1) = inf;
+
+stats.iterations            = numIter;
 stats.UNIFIED_RETURN_STATUS = UNIFIED_RETURN_STATUS;
 stats.cost                  = cost_CD;
 stats.nabla_L               = nabla_L;
