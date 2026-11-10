@@ -11,7 +11,6 @@ counter_correction_calls  = nan(nelem,1);
 counter_linesearch_calls  = nan(nelem,1);
 counter_restoration_calls = nan(nelem,1);
 
-
 for k = 1:nelem
     cost(k)                         = S.stats.single_iterations{k}.cost;
     maxConVio(k)                    = S.stats.single_iterations{k}.max_con_vio;
@@ -20,6 +19,7 @@ for k = 1:nelem
     counter_restoration_calls(k)    = S.stats.single_iterations{k}.counter_restoration_calls;
     counter_correction_calls(k)     = S.stats.single_iterations{k}.counter_correction_calls;
     counter_linesearch_calls(k)     = S.stats.single_iterations{k}.counter_linesearch_calls;
+
 end
 
 
@@ -29,6 +29,7 @@ evalSequentialStruct.cost                      = cost;
 evalSequentialStruct.scaled_d_ldx              = scaled_d_ldx ;
 evalSequentialStruct.maxConVio                 = maxConVio;
 evalSequentialStruct.alpha                     = alpha;
+evalSequentialStruct.time_per_iteration        = S.stats.time_per_iteration;
 evalSequentialStruct.counter_restoration_calls = counter_restoration_calls;
 evalSequentialStruct.counter_correction_calls  = counter_correction_calls;
 evalSequentialStruct.counter_linesearch_calls  = counter_linesearch_calls;

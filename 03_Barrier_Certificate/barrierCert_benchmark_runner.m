@@ -54,7 +54,7 @@ hess_est_method_1 = 'regularization'; % our default (see also sequentialCommon.m
 hess_est_method_2 = 'mirroring';      % 'BFGS', 'levenberg', 'mirroring'
 
 % common options shared by the methods
-commonOpts.maxiter       = 350;
+commonOpts.maxiter       = 500;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
 commonOpts.solver        = 'mosek';
@@ -76,9 +76,9 @@ end
 
 
 % variable names of the results table (one row per run)
-tableVariableNames = {'Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
+tableVariableNames = {'Prob. No.','Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
                         'Build Time (CD)','Build Time (SQ)','Solve Time (CD)','Solve Time (SQ)', ...
-                        'Iterations (CD)','Iterations (SQ)','Final Cost (CD)','Final Cost (SQ)', ...
+                        'Iterations (CD)','Iterations (SQ)','time/iter. (CD)','time/iter. (SQ)','Final Cost (CD)','Final Cost (SQ)', ...
                         'Solved (CD)','Solved (SQ)'};
 
 % extend the results table by the sequential run with the second Hessian
@@ -88,6 +88,7 @@ if enable_second_sequential
         ['Build Time (SQ ' hess_est_method_2 ')'], ...
         ['Solve Time (SQ ' hess_est_method_2 ')'], ...
         ['Iterations (SQ ' hess_est_method_2 ')'], ...
+        ['time/iter. (SQ ' hess_est_method_2 ')'], ...
         ['Final Cost (SQ ' hess_est_method_2 ')'], ...
         ['Solved (SQ ' hess_est_method_2 ')']];
 end
@@ -124,6 +125,13 @@ for kk = 1:numel(degV)
     hess_est_method = hess_est_method_1;
     solStruct_seq_VDP_regularization = solve_barrierCert_seq_bench_fun(probStruct_VDP,commonOpts,x0,hess_est_method);
 
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+
     seqSolverStructs_regularization{end+1} = solStruct_seq_VDP_regularization;
 
     % extract size and timing statistic from sequential and add some meta
@@ -137,6 +145,13 @@ for kk = 1:numel(degV)
         hess_est_method = hess_est_method_2;
         solStruct_seq_VDP_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_VDP,commonOpts,x0,hess_est_method);
 
+        % just some gap in display output
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_VDP_hessApprox2;
 
         % extract size and timing statistic from sequential
@@ -147,6 +162,13 @@ for kk = 1:numel(degV)
 
     % solve VDP example with two states using custom coordinate-descent
     solStruct_CD_VDP = solve_barrierCert_CD_bench_fun(probStruct_VDP,commonOpts,x0);
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
 
     cdSolverStructs{end+1} = solStruct_CD_VDP;
     probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_VDP.Name, kk, numel(degV));
@@ -204,6 +226,13 @@ for kk = 1:numel(degV)
     hess_est_method = hess_est_method_1;
     solStruct_seq_MiMo_regularization = solve_barrierCert_seq_bench_fun(probStruct_MiMo,commonOpts,x0,hess_est_method);
 
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+
     seqSolverStructs_regularization{end+1} = solStruct_seq_MiMo_regularization;
 
     % extract size and timing statistic from sequential and add some meta
@@ -217,6 +246,13 @@ for kk = 1:numel(degV)
         hess_est_method = hess_est_method_2;
         solStruct_seq_MiMo_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_MiMo,commonOpts,x0,hess_est_method);
 
+        % just some gap in display output
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_MiMo_hessApprox2;
 
         % extract size and timing statistic from sequential
@@ -227,6 +263,13 @@ for kk = 1:numel(degV)
 
     % solve MiMo example with two states using custom coordinate-descent
     solStruct_CD_MiMo = solve_barrierCert_CD_bench_fun(probStruct_MiMo,commonOpts,x0);
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
 
     cdSolverStructs{end+1} = solStruct_CD_MiMo;
     probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_MiMo.Name, kk, numel(degV));
@@ -285,6 +328,13 @@ for kk = 1:numel(degV)
     hess_est_method = hess_est_method_1;
     solStruct_seq_Aircraft_affine_regularization = solve_barrierCert_seq_bench_fun(probStruct_Aircraft_affine,commonOpts,x0,hess_est_method);
 
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+
     seqSolverStructs_regularization{end+1} = solStruct_seq_Aircraft_affine_regularization;
 
     % extract size and timing statistic from sequential and add some meta
@@ -298,6 +348,13 @@ for kk = 1:numel(degV)
         hess_est_method = hess_est_method_2;
         solStruct_seq_Aircraft_affine_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_Aircraft_affine,commonOpts,x0,hess_est_method);
 
+        % just some gap in display output
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Aircraft_affine_hessApprox2;
 
         % extract size and timing statistic from sequential
@@ -308,6 +365,13 @@ for kk = 1:numel(degV)
 
     % solve Aircraft_affine example with two states using custom coordinate-descent
     solStruct_CD_Aircraft_affine = solve_barrierCert_CD_bench_fun(probStruct_Aircraft_affine,commonOpts,x0);
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
 
     cdSolverStructs{end+1} = solStruct_CD_Aircraft_affine;
     probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Aircraft_affine.Name, kk, numel(degV));
@@ -510,6 +574,13 @@ for kk = 1:numel(degV)
     hess_est_method = hess_est_method_1;
     solStruct_seq_Satellite_regularization = solve_barrierCert_seq_bench_fun(probStruct_Satellite,commonOpts,x0,hess_est_method);
 
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+
     seqSolverStructs_regularization{end+1} = solStruct_seq_Satellite_regularization;
 
     % extract size and timing statistic from sequential and add some meta
@@ -523,6 +594,13 @@ for kk = 1:numel(degV)
         hess_est_method = hess_est_method_2;
         solStruct_seq_Satellite_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_Satellite,commonOpts,x0,hess_est_method);
 
+        % just some gap in display output
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Satellite_hessApprox2;
 
         % extract size and timing statistic from sequential
@@ -533,6 +611,13 @@ for kk = 1:numel(degV)
 
     % solve Satellite example with two states using custom coordinate-descent
     solStruct_CD_Satellite = solve_barrierCert_CD_bench_fun(probStruct_Satellite,commonOpts,x0);
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
 
     cdSolverStructs{end+1} = solStruct_CD_Satellite;
     probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Satellite.Name, kk, numel(degV));

@@ -14,7 +14,6 @@ G0 = [3.95382671347060	-0.230032507976836	 0.0316965275615692	 0.292992065909380
 
 g = (x'*G0*x) - 1;
 
-
 % Lyapunov function candidate
 V = casos.PS.sym('v',monomials(x,degV));
 

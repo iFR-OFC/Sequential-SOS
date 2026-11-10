@@ -106,12 +106,21 @@ totalBuildTime = toc(buildTimes_start);
 
 maxIter = commonOpts.maxiter;
 
-
 Vval = x0(1);
 
-fprintf('-------------------------------------------------- \n')
-fprintf('Custom Coordinate Descent for Region-of-Attraction \n')
-fprintf('-------------------------------------------------- \n')
+fprintf('------------------------------------------------------------------------------------------\n')
+fprintf('Custom Coordinate Descent for Region-of-Attraction\n')
+fprintf('------------------------------------------------------------------------------------------\n')
+fprintf('-------------------------------------------------------\n')
+fprintf('Settings \n ')
+fprintf('Solver\t\t\t\t- %s\n ', commonOpts.solver);
+fprintf('Maximum iterations\t\t- %d\n ', commonOpts.maxiter);
+fprintf(['' char(949) '_opt\t\t\t\t- %d\n'],commonOpts.tolerance_opt);
+fprintf('-------------------------------------------------------\n');
+fprintf('\n');
+fprintf('Solver build time \t\t:  %0.2d s\n', totalBuildTime);
+fprintf('Start solving ... \n');
+fprintf('\n');
 
 % x_prev for termination criterion; take initial guess as first "previous"
 % iteration
@@ -134,7 +143,6 @@ solvetime_all2(1) = 0;
 
 % zeroth iterate (initial guess)
 cost_CD(1) = full(eval_cost(x0));
-fprintf('Iteration %d: f = %g\n',0,cost_CD(1));
 
 % no multipliers available at the initial guess -> use zeros (cf. sequential)
 lam_gs_0 = zeros(numel(lam_gs),1);
@@ -145,6 +153,14 @@ inf_delta_x_0 = norm(full(poly2basis(x_prev)),inf);
 nabla_L(1)        = full(eval_gradLag(x0,lam_gs_0));
 inf_g_0           = full(eval_gradLag_inf_norm(x0,lam_gs_0));
 nabla_L_scaled(1) = nabla_L(1)*inf_delta_x_0/(max(1,abs(cost_CD(1)) + inf_g_0));
+
+% display output header
+fprintf('------------------------------------------------------------------------------------------\n');
+fprintf('%-8s%-15s%-15s\n','iter','obj','||dLdx||');
+fprintf('------------------------------------------------------------------------------------------\n');
+
+% display output current iterate (zeroth iteration = initial guess)
+fprintf('%-8d%-15g%-15g\n',0,cost_CD(1),nabla_L(1));
 
 solved = 1;
 
@@ -208,9 +224,6 @@ for iter = 2:maxIter+1
     end
 
 
-    % show progress
-    fprintf('Iteration %d: f = %g\n',iter-1,full(sol2.f));
-        
       % extract lagrange multiplier from each subproblem
      if s1_ok
          lam_gs_it = [sol1.lam_g(1);sol2.lam_g];
@@ -229,7 +242,16 @@ for iter = 2:maxIter+1
       nabla_L(iter) = full(eval_gradLag( sol_x_it,lam_gs_it));
 
       inf_g   = full(eval_gradLag_inf_norm(sol_x_it,lam_gs_it));
-    
+
+     % display output header every 10th iteration
+     if ~mod(iter-1,10) && iter-1 > 0
+         fprintf('%-8s%-15s%-15s\n','iter','obj','||dLdx||');
+         fprintf('------------------------------------------------------------------------------------------\n');
+     end
+
+     % display output current iterate
+     fprintf('%-8d%-15g%-15g\n',iter-1,cost_CD(iter),nabla_L(iter));
+
      % just for plotting
      nabla_L_scaled(iter) = nabla_L(iter)*inf_delta_x/(max(1,abs(full(sol2.f)) + inf_g ));
     
@@ -271,18 +293,26 @@ if ~strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && iter <= maxIter
         UNIFIED_RETURN_STATUS = 'RET_LIMITED';
     end
 end
-% ************************************************************************
 
-% summary output (cf. sequential solver)
+
+
 fprintf('------------------------------------------------------------------------------------------ \n')
 if strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && solved ~=2
+
     fprintf('Solution status: Optimal solution found\n')
+
 elseif strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && solved ==2
+
     fprintf('Solution status: Solved, but abort during iteration (KKT not reached)\n')
+
 elseif iter == maxIter+1
+
     fprintf('Solution status: Maximum number of iterations reached\n')
+
 else
+
     fprintf('Solution status: Problem infeasible.\n')
+
 end
 fprintf('Solution time: %.4f s\n',totalSolveTime)
 fprintf('Build time: %.4f s\n',totalBuildTime)
@@ -305,6 +335,7 @@ stats.initial_guess_trials      = initial_guess_trials;
 
 stats.totalSolveTime = totalSolveTime;
 stats.totalBuildTime = totalBuildTime;
+stats.time_per_iteration = stats.totalSolveTime / stats.iterations;
 stats.solver1_stats  = S1.stats;
 stats.solver2_stats  = S2.stats;
 
@@ -314,9 +345,15 @@ sol.x = [Vval; s1val];
 solStruct.sol          = sol;
 solStruct.stats        = stats;
 
-% store information about subsolver e.g. for problem size
-solStruct.inf0.solver1 =  S1.info;
-solStruct.inf0.solver2 =  S2.info;
+% store information about subsolver
+solStruct.info.solver1 =  S1.info;
+solStruct.info.solver2 =  S2.info;
 
+% store problem size
+solStruct.info.probSize_S1.A   = S1.info.sdpsol.conic.size_a;
+solStruct.info.probSize_S1.gram = S1.info.gram.Kc;
+
+solStruct.info.probSize_S2.A   = S2.info.sdpsol.conic.size_a;
+solStruct.info.probSize_S2.gram = S2.info.gram.Kc;
 
 end

@@ -1,18 +1,17 @@
 function solStruct = solve_ctrlDesign_CD_bench_fun(probStruct,commonOpts,x0)
 
-
-x  = probStruct.x;
-u  = probStruct.u;
-f  = probStruct.f;
-g  = probStruct.g;
-s1 = probStruct.s1;
-s2 = probStruct.s2;
-s3 = probStruct.s3;
-s4 = probStruct.s4;
-V  = probStruct.V;
-kappa = probStruct.kappa;
-b     = probStruct.b;
-
+% de-pack for better readability
+x       = probStruct.x;
+u       = probStruct.u;
+f       = probStruct.f;
+g       = probStruct.g;
+s1      = probStruct.s1;
+s2      = probStruct.s2;
+s3      = probStruct.s3;
+s4      = probStruct.s4;
+V       = probStruct.V;
+kappa   = probStruct.kappa;
+b       = probStruct.b;
 
 l = 1e-6*(x'*x);
 
@@ -25,19 +24,19 @@ startBuildTime = tic;
 
 % setup first solver
 sos = struct('x',[s1;s2;s3;s4;kappa],... % decision variables
-    'p',[V;b]);    % parameter
+             'p',[V;b]);    % parameter
 
 % SOS constraints
 sos.('g') = [
-    s1;
-    s2;
-    s3;
-    s4;
-    s1*(V-b) - nabla(V,x)*subs(f,u,kappa);
-    s2*(V-b) + kappa - umin;
-    s3*(V-b) + umax - kappa;
-    s4*(V-b) - g
-    ];
+            s1;
+            s2;
+            s3;
+            s4;
+            s1*(V-b) - nabla(V,x)*subs(f,u,kappa);
+            s2*(V-b) + kappa - umin;
+            s3*(V-b) + umax - kappa;
+            s4*(V-b) - g
+            ];
 
 % states + constraint cones
 opts.Kx           = struct('lin', length(sos.x));
@@ -46,20 +45,23 @@ opts.newton_solver = [];
 opts.error_on_fail = 0; % we do our own check in the main loop
 
 if  strcmpi(commonOpts.solver,'mosek')
-opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
-opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+
+    opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+    opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 
 elseif strcmpi(commonOpts.solver,'clarabel')
-opts.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
+
+    opts.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
 
 elseif strcmpi(commonOpts.solver,'scs')
+
     opts.sdpsol_options.scs = commonOpts.sdp_solver_opts;
+
 
 end
 
 % solver for multiplier
 S1 = casos.sossol('S1',commonOpts.solver,sos,opts);
-
 
 % setup second solver
 cost = dot(g-(V-b),g-(V-b));
@@ -85,22 +87,28 @@ opts.newton_solver = [];
 opts.error_on_fail = 0; % we do our own check in the main loop
 
 if  strcmpi(commonOpts.solver,'mosek')
-opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
-opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+    
+    opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+    opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 
 elseif strcmpi(commonOpts.solver,'clarabel')
-opts.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
+
+    opts.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
 
 elseif strcmpi(commonOpts.solver,'scs')
+
     opts.sdpsol_options.scs = commonOpts.sdp_solver_opts;
 
 end
 
-% setup solver: solve Lyapunov function
+% setup solver: solve for Lyapunov function
 S2 = casos.sossol('S2',commonOpts.solver,sos,opts);
 
+% functions for KKT condition
+
 % common constraints for Lagrangian (same order as sequential solver)
-g_common  = [s1;
+g_common  = [
+             s1;
              s2;
              s3;
              s4;
@@ -109,7 +117,8 @@ g_common  = [s1;
              s1*(V-b) - nabla(V,x)*subs(f,u,kappa)-l;
              s2*(V-b) + kappa - umin;
              s3*(V-b) + umax - kappa;
-             s4*(V-b) - g];
+             s4*(V-b) - g
+            ];
 
 % same order as initial guess for decision variables
 sos_x     = [V;s1;s2;s3;s4;kappa;b];
@@ -127,25 +136,29 @@ eval_gradLag  =  casos.Function('f',{sos_x,lam_gs}, { norm(jacobian( poly2basis(
 eval_gradLag_inf_norm  =  casos.Function('f',{sos_x,lam_gs}, { norm(poly2basis(casos.PS(dot(lam_gs,g_common))),inf) });
 
 % cost function of the V-step (needed to evaluate the cost at the zeroth
-% iterate/initial guess, cf. SequentialCommon: eval_cost of full(nlsos.f))
 eval_cost = casos.Function('f',{sos_x}, { cost });
 
 totalBuildTime = toc(startBuildTime);
 
+%% Preparation
 
-%% Initial guess
-
-fval_old = [];
-
-maxIter = commonOpts.maxiter;
-
-% initial guess [V;kappa;b] (same ordering as in x0)
+% initial guess
 sol2_x = [x0(1);
-          x0(end)];
+         x0(end)];
 
-fprintf('-------------------------------------------------- \n')
-fprintf('Custom Coordinate Descent for Control Design \n')
-fprintf('-------------------------------------------------- \n')
+fprintf('------------------------------------------------------------------------------------------\n')
+fprintf('Custom Coordinate Descent for Control Design\n')
+fprintf('------------------------------------------------------------------------------------------\n')
+fprintf('-------------------------------------------------------\n')
+fprintf('Settings \n ')
+fprintf('Solver\t\t\t\t- %s\n ', commonOpts.solver);
+fprintf('Maximum iterations\t\t- %d\n ', commonOpts.maxiter);
+fprintf(['' char(949) '_opt\t\t\t\t- %d\n'],commonOpts.tolerance_opt);
+fprintf('-------------------------------------------------------\n');
+fprintf('\n');
+fprintf('Solver build time \t\t:  %0.2d s\n', totalBuildTime);
+fprintf('Start solving ... \n');
+fprintf('\n');
 
 % x_prev for termination criterion; take initial guess as first "previous"
 % iteration
@@ -173,7 +186,6 @@ solvetime_all2(1) = 0;
 
 % zeroth iterate (initial guess)
 cost_CD(1) = full(eval_cost(x0));
-fprintf('Iteration %d: f = %g\n',0,cost_CD(1));
 
 % no multipliers available at the initial guess -> use zeros (cf. sequential)
 lam_gs_0 = zeros(numel(lam_gs),1);
@@ -185,66 +197,95 @@ nabla_L(1)        = full(eval_gradLag(x0,lam_gs_0));
 inf_g_0           = full(eval_gradLag_inf_norm(x0,lam_gs_0));
 nabla_L_scaled(1) = nabla_L(1)*inf_delta_x_0/(max(1,abs(cost_CD(1)) + inf_g_0));
 
-%% V-s-iteration
-% real k-th iteration runs at iter = k+1 (cf. sequential)
+% display output header
+fprintf('------------------------------------------------------------------------------------------\n');
+fprintf('%-8s%-15s%-15s\n','iter','obj','||dLdx||');
+fprintf('------------------------------------------------------------------------------------------\n');
+
+% display output current iterate (zeroth iteration = initial guess)
+fprintf('%-8d%-15g%-15g\n',0,cost_CD(1),nabla_L(1));
+
+buildBisecTime = 0;
+solveBisecTime  = 0;
+solved = 1;
+
+%% Main-loop (V-s-iteration)
+
+maxIter = commonOpts.maxiter;
+
+startSolve_mainLoop = tic;
 for iter = 2:maxIter+1
 
 
     %% s-step
     s1start = tic;
     % second fall-back
-    if useBisection 
-
+    if useBisection
+        startBuildBisec = tic;
         useBisection = false;
         s1_ok = false;
+
         % solver 1: s1-step
         sos0 = struct('x',[s1;s2;s3;s4;kappa],... % decision variables
-            'f',-b,...
-            'p',V);    % parameter
-        
+                      'f',-b,...
+                      'p',V);    % parameter
+
         % SOS constraints
         sos0.('g') = [
-            s1;
-            s2;
-            s3;
-            s4;
-            s1*(V-b) - nabla(V,x)*subs(f,u,kappa);
-            s2*(V-b) + kappa - umin;
-            s3*(V-b) + umax - kappa;
-            s4*(V-b) - g
-            ];
+                        s1;
+                        s2;
+                        s3;
+                        s4;
+                        s1*(V-b) - nabla(V,x)*subs(f,u,kappa);
+                        s2*(V-b) + kappa - umin;
+                        s3*(V-b) + umax - kappa;
+                        s4*(V-b) - g
+                     ];
 
 
         % states + constraint are SOS cones
         opts = [];
         opts.Kx = struct('lin', length(sos0.x));
         opts.Kc = struct('sos', length(sos0.g));
-        opts.sossol = 'mosek';
+        opts.sossol = commonOpts.solver;
         opts.error_on_fail = 0;
         opts.sossol_options.newton_solver =[];
+
         % bisection fallback uses mosek: pass its params only if configured
-        if isfield(commonOpts.sdp_solver_opts,'mosek_param')
-        opts.sossol_options.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
-        opts.sossol_options.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+        if  strcmpi(commonOpts.solver,'mosek')
+            
+            opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+            opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+        
+        elseif strcmpi(commonOpts.solver,'clarabel')
+        
+            opts.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
+        
+        elseif strcmpi(commonOpts.solver,'scs')
+        
+            opts.sdpsol_options.scs = commonOpts.sdp_solver_opts;
+        
         end
 
-        % build first solver
-
-        % solve by bisection
+        % build bisection solver
         S0 = casos.qcsossol('S','bisection',sos0,opts);
-        % evaluate
-        sol0 = S0('p',casos.PD(sol2_x(1)));
+        buildBisecTime = toc( startBuildBisec );
 
-            switch(S0.stats.UNIFIED_RETURN_STATUS)
-                case {'SOLVER_RET_SUCCESS'}
-                   
-                         sol1_x = sol0.x;
-                         % break; % take the first feasible level set
-                otherwise
-                    UNIFIED_RETURN_STATUS = S0.stats.UNIFIED_RETURN_STATUS;
-                    break
-            end
- 
+        % evaluate
+        solveBisecTime = tic;
+            sol0 = S0('p',casos.PD(sol2_x(1)));
+        solveBisecTime = toc(solveBisecTime);
+
+        switch(S0.stats.UNIFIED_RETURN_STATUS)
+            case {'SOLVER_RET_SUCCESS'}
+
+                sol1_x = sol0.x;
+
+            otherwise
+                UNIFIED_RETURN_STATUS = S0.stats.UNIFIED_RETURN_STATUS;
+                break
+        end
+
     else
         sol1 = S1('p',sol2_x);
 
@@ -271,13 +312,9 @@ for iter = 2:maxIter+1
         end
     end
 
-
-
-
     solvetime_all1(iter) =  toc(s1start);
 
-
-    %% V-step
+    % V-step
     S2start = tic;
 
     sol2 = S2('p',sol1_x);
@@ -302,113 +339,122 @@ for iter = 2:maxIter+1
 
         % only break, in case we do not run the third initial guess
         if ~useBisection
-        break
+            break
         end
 
     end
 
-
+    % only check if we did not run the bisection to get a feasible intial
+    % guess
     if ~useBisection
-    % show progress
-    fprintf('Iteration %d: f = %g\n',iter-1,full(sol2.f));
 
 
-    % lam of s1..s4 (s2,s3 are nu-vectors) from S1, rest from S2
-    if s1_ok
-        % in same order as constraints    
-        lam_gs_it = [sol1.lam_g(1:length([s1;s2;s3;s4]));sol2.lam_g];
-    else
-        % in case S1 was infeasible, set multiplier to zero
-        lam_gs_it = [zeros(length([s1;s2;s3;s4]),1);sol2.lam_g];
-    end
+        % lam of s1..s4 (s2,s3 are nu-vectors) from S1, rest from S2
+        if s1_ok
+            % in same order as constraints
+            lam_gs_it = [sol1.lam_g(1:length([s1;s2;s3;s4]));sol2.lam_g];
+        else
+            % in case S1 was infeasible, set multiplier to zero
+            lam_gs_it = [zeros(length([s1;s2;s3;s4]),1);sol2.lam_g];
+        end
 
-    % dec vars: V,b from S2; s1..s4,kappa from S1
-    sol_x_it  = [sol2.x(1);     % V from S2
-                 sol1_x;        % s1,s2,s3,s4 from S1
-                 sol2.x(end)];  % b from S2
+        % dec. var.
+        sol_x_it  = [sol2.x(1);     % V from S2
+                     sol1_x;        % s1,s2,s3,s4 from S1
+                     sol2.x(end)];  % b from S2
 
-    % for scaled termination
-    delta_x     = sol_x_it - x_prev;
-    inf_delta_x = norm(full(poly2basis(delta_x)),inf);
+        % for scaled termination
+        delta_x     = sol_x_it - x_prev;
+        inf_delta_x = norm(full(poly2basis(delta_x)),inf);
 
-    % evaluate first order KKT at current iterate
-    nabla_L(iter) = full(eval_gradLag( sol_x_it,lam_gs_it));
+        % evaluate first order KKT at current iterate
+        nabla_L(iter) = full(eval_gradLag( sol_x_it,lam_gs_it));
 
-    inf_g   = full(eval_gradLag_inf_norm(sol_x_it,lam_gs_it));
+        % inf. norm of lambda*constraint(s)
+        inf_g   = full(eval_gradLag_inf_norm(sol_x_it,lam_gs_it));
 
-    % just for plotting
-    nabla_L_scaled(iter) = nabla_L(iter)*inf_delta_x/(max(1,abs(full(sol2.f)) + inf_g ));
+        % display output header every 10th iteration
+        if ~mod(iter-1,10) && iter-1 > 0
+            fprintf('%-8s%-15s%-15s\n','iter','obj','||dLdx||');
+            fprintf('------------------------------------------------------------------------------------------\n');
+        end
 
-    % scaled termination criterion
-    if nabla_L(iter) <= commonOpts.tolerance_opt*(max(1,abs(full(sol2.f)) + inf_g ))/inf_delta_x
-        break
-    else
-        % set current iterate to previous iterate
-        x_prev =  sol_x_it;
-    end
+        % display output current iterate
+        fprintf('%-8d%-15g%-15g\n',iter-1,cost_CD(iter),nabla_L(iter));
 
-    % if ~isempty(fval_old)
-    %     if abs(full(sol2.f - fval_old)) <= commonOpts.tolerance_opt
-    %         break
-    %     else
-    %         fval_old = sol2.f;
-    %     end
-    % else
-    %     fval_old = sol2.f;
-    % end
+        % just for plotting
+        nabla_L_scaled(iter) = nabla_L(iter)*inf_delta_x/(max(1,abs(full(sol2.f)) + inf_g ));
 
-    end
+        % scaled termination criterion
+        if nabla_L(iter) <= commonOpts.tolerance_opt*(max(1,abs(full(sol2.f)) + inf_g ))/inf_delta_x
+            break
+        else
+            % set current iterate to previous iterate
+            x_prev =  sol_x_it;
+        end
 
+    end % check if we need bisection
 
 end % end for-loop (inner)
 
-totalSolveTime = sum(solvetime_all1) + sum(solvetime_all2);
+totalSolveTime = toc(startSolve_mainLoop) - buildBisecTime;
 
-% number of real CD iterations; the zeroth iterate (initial guess) is stored
-% at index 1 and is not counted (cf. sequential solver: stats.iterations = iter-1)
 numIter = iter - 1;
 
+%% Check and prepare output
 
-if iter == maxIter+1
-    UNIFIED_RETURN_STATUS = 'RET_LIMITED';
-    stats.totalSolveTime = totalSolveTime;
-end
-
-
-% ************************************************************************
-% check if coordinate-descent was infeasible after a few iterations
-% Note: in this case we did not reach the termination criterion, but have a
-% feasible solution
-
-% Meaning: the run only counts as successful if a subsolver became
-% infeasible after a minimum number of iterations (cf. commonOpts.miniter)
+% Meaning: the run only counts as successful if a sub-solver became
+% infeasible after a minimum number of iterations
 % and the cost function made some progress over these iterations;
 % otherwise the run is marked as RET_LIMITED
 if ~strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && iter <= maxIter
+
     if numIter >= commonOpts.miniter && abs(cost_CD(1) - cost_CD(end)) > commonOpts.tolerance_opt
+
         UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
+        solved = 2;
     else
         UNIFIED_RETURN_STATUS = 'RET_LIMITED';
     end
 end
-% ************************************************************************
 
-% summary output (cf. sequential solver)
+
+% check the case with max. iter i.e. it might be CD just needs many
+% iterations to converge according to KKT conditions, yet, the solution
+% might be already close
+
+% we are feasible, but are not converged until max. iter
+if strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && iter >= maxIter
+    % check for progress
+    if  abs(cost_CD(1) - cost_CD(end)) > commonOpts.tolerance_opt
+
+        UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
+        solved = 3;
+
+    else
+        UNIFIED_RETURN_STATUS = 'RET_LIMITED';
+    end
+
+end
+
+% summary output
 fprintf('------------------------------------------------------------------------------------------ \n')
-if strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS')
+if strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && solved == 1
     fprintf('Solution status: Optimal solution found\n')
-elseif iter == maxIter+1
-    fprintf('Solution status: Maximum number of iterations reached\n')
+elseif solved == 2
+    fprintf('Solution status: Abort midway. Solved to feasible point, but did not reach KKT points\n')
+elseif solved == 3
+    fprintf('Solution status: Maximum number of iterations reached. Solved, but needs furter checks. \n')
 else
     fprintf('Solution status: Problem infeasible.\n')
 end
+
 fprintf('Solution time: %.4f s\n',totalSolveTime)
-fprintf('Build time: %.4f s\n',totalBuildTime)
-fprintf('Total time: %.4f s\n',totalBuildTime+totalSolveTime)
+fprintf('Build time: %.4f s\n',totalBuildTime + buildBisecTime)
+fprintf('Total time: %.4f s\n',totalBuildTime + buildBisecTime + totalSolveTime)
 fprintf('------------------------------------------------------------------------------------------ \n')
 
-% pad diagnostic arrays to numIter+1 entries (index 1 = zeroth iterate) so
-% that they line up with 0:stats.iterations in the convergence plots
+% store information
 cost_CD(end+1:numIter+1)        = cost_CD(end);
 nabla_L(end+1:numIter+1)        = inf;
 nabla_L_scaled(end+1:numIter+1) = inf;
@@ -421,21 +467,35 @@ stats.nabla_L_scaled        = nabla_L_scaled;
 
 stats.initial_guess_trials  = initial_guess_trials;
 
-stats.totalSolveTime = totalSolveTime;
-stats.totalBuildTime = totalBuildTime;
-stats.solver1_stats  = S1.stats;
-stats.solver2_stats  = S2.stats;
+stats.totalSolveTime     = totalSolveTime;
+stats.totalBuildTime     = totalBuildTime + buildBisecTime;
+stats.time_per_iteration = stats.totalSolveTime / stats.iterations;
 
-% store final solution (same order as the sequential solver's decision
-% variables, cf. sol_x_it in the main loop)
+% write to struct
+stats.solver1_stats      = S1.stats;
+stats.solver2_stats      = S2.stats;
+
+% individual solver times
+stats.totalSolveTime_S1     =  sum(solvetime_all1);
+stats.totalSolveTime_S2     =  sum(solvetime_all2);
+stats.totalSolveTime_bisect = solveBisecTime;
+
+
+% store final solution
 sol.x = sol_x_it;
 
 solStruct.sol          = sol;
 solStruct.stats        = stats;
 
-% store information about subsolver e.g. for problem size
-solStruct.inf0.solver1 =  S1.info;
-solStruct.inf0.solver2 =  S2.info;
+% store information about sub-solver e.g. for problem size
+solStruct.info.solver1 =  S1.info;
+solStruct.info.solver2 =  S2.info;
 
+% store problem size explicitly
+solStruct.info.probSize_S1.A   = S1.info.sdpsol.conic.size_a;
+solStruct.info.probSize_S1.gram = S1.info.gram.Kc;
+
+solStruct.info.probSize_S2.A   = S2.info.sdpsol.conic.size_a;
+solStruct.info.probSize_S2.gram = S2.info.gram.Kc;
 
 end

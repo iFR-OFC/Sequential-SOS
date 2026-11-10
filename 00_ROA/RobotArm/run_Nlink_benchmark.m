@@ -89,9 +89,9 @@ Nmin   = 2;
 Nmax   = 7;  % n = 2*N
 
 % variable names of the results table (one row per run)
-tableVariableNames = {'Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
+tableVariableNames = {'Prob. No.','Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
     'Build Time (CD)','Build Time (SQ)','Solve Time (CD)','Solve Time (SQ)', ...
-    'Iterations (CD)','Iterations (SQ)','Final Cost (CD)','Final Cost (SQ)', ...
+    'Iterations (CD)','Iterations (SQ)','time/iter. (CD)','time/iter. (SQ)','Final Cost (CD)','Final Cost (SQ)', ...
     'Solved (CD)','Solved (SQ)'};
 
 % extend the results table by the sequential run with the second Hessian
@@ -101,6 +101,7 @@ if enable_second_sequential
         ['Build Time (SQ ' hess_est_method_2 ')'], ...
         ['Solve Time (SQ ' hess_est_method_2 ')'], ...
         ['Iterations (SQ ' hess_est_method_2 ')'], ...
+        ['time/iter. (SQ ' hess_est_method_2 ')'], ...
         ['Final Cost (SQ ' hess_est_method_2 ')'], ...
         ['Solved (SQ ' hess_est_method_2 ')']];
 end
@@ -138,6 +139,13 @@ for kk = 1:(Nmax-Nmin+1)
     hess_est_method = hess_est_method_1;
     solStruct_seq_Nlink_regularization = solve_ROA_Nlink_seq_bench_fun(probStruct_Nlink,commonOpts,x0,hess_est_method);
 
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+
     seqSolverStructs_regularization{end+1} = solStruct_seq_Nlink_regularization;
 
     % extract size and timing statistic from sequential and add some meta
@@ -152,6 +160,13 @@ for kk = 1:(Nmax-Nmin+1)
         hess_est_method = hess_est_method_2;
         solStruct_seq_Nlink_hessApprox2 = solve_ROA_Nlink_seq_bench_fun(probStruct_Nlink,commonOpts,x0,hess_est_method);
 
+        % just some gap in display output
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Nlink_hessApprox2;
 
         % extract size and timing statistic from sequential
@@ -165,11 +180,25 @@ for kk = 1:(Nmax-Nmin+1)
         x0_bad = generate_initGuess_Nlink_badInit(probStruct_Nlink);
         solStruct_seq_Nlink_badInit = solve_ROA_Nlink_seq_bench_fun(probStruct_Nlink,commonOpts,x0_bad,hess_est_method_1);
 
+        % just some gap in display output
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+
         seqSolverStructs_badInit{end+1} = solStruct_seq_Nlink_badInit;
     end
 
     % solve Nlink example using custom coordinate-descent
     solStruct_CD_Nlink = solve_ROA_Nlink_CD_bench_fun(probStruct_Nlink,commonOpts,x0);
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
 
     cdSolverStructs{end+1} = solStruct_CD_Nlink;
     probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Nlink.Name, kk, Nmax-Nmin+1);

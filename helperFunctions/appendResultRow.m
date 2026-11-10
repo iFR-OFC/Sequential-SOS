@@ -1,6 +1,7 @@
 % append one row to the results table for a single run:
 % compares coordinate descent (CD) and sequential (SQ) and stores the
-% problem sizes of the underlying SDP (size of A and of the Gram matrices)
+% problem sizes of the underlying SDP (size of A and of the Gram matrices).
+% The first column of each row is the benchmark number ('Prob. No.', as '#<no>')
 %
 % If a fifth argument is given (sequential run with the second Hessian
 % estimation method, cf. enable_second_sequential in the runner), the row
@@ -39,6 +40,7 @@ if hasCD
     iterationsCD = solStruct_cd.stats.iterations;
     buildTimeCD  = solStruct_cd.stats.totalBuildTime;
     finalCostCD  = solStruct_cd.stats.cost(end);
+    timePerIterCD = solStruct_cd.stats.time_per_iteration;
 end
 
 % sequential
@@ -46,6 +48,7 @@ solveTimeSeq  = solStruct_seq.stats.total_solve_time;
 buildTimeSeq  = solStruct_seq.stats.solver_build_time;
 iterationsSeq = solStruct_seq.stats.iterations;
 finalCostSeq  = solStruct_seq.stats.single_iterations{end}.cost;
+timePerIterSeq = solStruct_seq.stats.time_per_iteration;
 
 % size of the underlying SDP matrix A, i.e. number of constraints x number
 % of decision variables (integer type, so that the table shows e.g. 221260
@@ -58,12 +61,15 @@ n_dec = int64(solStruct_seq.info.sossol_convex.sdpsol.conic.size_a(2));
 sizeGram = strjoin(string(solStruct_seq.info.sossol_convex.gram.Kc(:)).', ', ');
 
 % append the row for this run (sorted by problem and run order)
-row = {probStruct.Name, n_con, n_dec, sizeGram};
+% first column: number of the benchmark (row index of the results table),
+% written as '#<no>'
+probNo = size(tableRows,1) + 1;
+row = {sprintf('#%d',probNo), probStruct.Name, n_con, n_dec, sizeGram};
 if hasCD
     row = [row, buildTimeCD, buildTimeSeq, solveTimeCD, solveTimeSeq, ...
-        iterationsCD, iterationsSeq, finalCostCD, finalCostSeq];
+        iterationsCD, iterationsSeq, timePerIterCD, timePerIterSeq, finalCostCD, finalCostSeq];
 else
-    row = [row, buildTimeSeq, solveTimeSeq, iterationsSeq, finalCostSeq];
+    row = [row, buildTimeSeq, solveTimeSeq, iterationsSeq, timePerIterSeq, finalCostSeq];
 end
 
 % solved flag per runner: 1 if the run was successful/feasible, 0 otherwise
@@ -83,8 +89,9 @@ if ~isempty(solStruct_seq_hessApprox2)
     buildTimeSeq2  = solStruct_seq_hessApprox2.stats.solver_build_time;
     iterationsSeq2 = solStruct_seq_hessApprox2.stats.iterations;
     finalCostSeq2  = solStruct_seq_hessApprox2.stats.single_iterations{end}.cost;
+    timePerIterSeq2 = solStruct_seq_hessApprox2.stats.time_per_iteration;
 
-    row = [row, buildTimeSeq2, solveTimeSeq2, iterationsSeq2, finalCostSeq2];
+    row = [row, buildTimeSeq2, solveTimeSeq2, iterationsSeq2, timePerIterSeq2, finalCostSeq2];
 
     if includeSolved
         solvedSeq2 = double(strcmp(solStruct_seq_hessApprox2.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS'));
