@@ -8,11 +8,14 @@ It contains the case benchmarks for different nonconvex sum-of-squares problems,
 This repository cotains the scripts to reproduce the benchmarks.
 
 ### General Requirements and Setup
-The benchmarks itself does not not need to be installed. Only a [stable version](https://github.com/ifr-acso/casos/releases/latest) of CaΣoS, [MOSEK](https://www.mosek.com/downloads/) v11.1 is needed and CasADi v3.8.1 are required. 
+The benchmarks itself does not not need to be installed. Only a [stable version](https://github.com/ifr-acso/casos/releases/latest) of CaΣoS, [MOSEK](https://www.mosek.com/downloads/) v11.1 is needed and CasADi v3.7.2 are required. 
 
-  1. Download CasADi v3.8.1 and add it to your Matlab path.
-  2. Download and install MOSEK, and add the solver to the Matlab path.
-  3. Add the CaΣoS root folder (the one that contains the directory +casos) to your Matlab path.
+  1. For reproduction use MATLAB 26.1.0.3346908 (R2026a) Update 5
+  **Note**
+  > If other MATLAB releases are used, this might result in different results. Therefore, for reproduction follow these guidelines! 
+  2. Download CasADi v3.7.2 and add it to your Matlab path.
+  3. Download and install MOSEK v11.2.7, and add the solver to the Matlab path.
+  4. Add the CaΣoS root folder (the one that contains the directory +casos) to your Matlab path.
 
 If installed correctly, you can excute the corresponding files as outlined below for reproduction. The benchmarks in the  [paper](https://arxiv.org/pdf/2602.02394) were executed with MATLAB 2026a
 on a computer with Windows 11 running on an AMD Ryzen 9 5950X 16-Core Processor with 3.40 GHz and 128 GB RAM.
