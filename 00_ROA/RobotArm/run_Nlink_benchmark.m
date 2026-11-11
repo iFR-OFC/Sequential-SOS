@@ -58,19 +58,16 @@ hess_est_method_2 = 'levenberg';           % 'BFGS', 'levenberg', 'mirroring'
 commonOpts.maxiter       = 100;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
-commonOpts.solver        = 'mosek';
+commonOpts.solver        = 'clarabel';
 commonOpts.miniter       = 5; % minimum iterations before an aborted CD run still counts as successful
 
 % MOSEK settings
 
 if strcmpi(commonOpts.solver,'mosek')
     commonOpts.sdp_solver_opts.mosek_param = struct( ...
-        'MSK_IPAR_NUM_THREADS',            1); 
+        'MSK_IPAR_NUM_THREADS',            0); 
     commonOpts.sdp_solver_opts.mosek_echo = 0;
-    % 'MSK_DPAR_INTPNT_CO_TOL_PFEAS',    1e-7, ...
-    % 'MSK_DPAR_INTPNT_CO_TOL_DFEAS',    1e-7, ...
-    % 'MSK_DPAR_INTPNT_CO_TOL_REL_GAP',  1e-7, ...
-    % 'MSK_DPAR_INTPNT_CO_TOL_MU_RED',   1e-7);
+
 
 elseif strcmpi(commonOpts.solver,'clarabel')
         commonOpts.sdp_solver_opts.direct_solve_method =  'FAER';
@@ -86,7 +83,7 @@ deg    = 2;
 
 % number of links: the robot arm has 2*N states
 Nmin   = 2;
-Nmax   = 7;  % n = 2*N
+Nmax   = 8;  % n = 2*N
 
 % variable names of the results table (one row per run)
 tableVariableNames = {'Prob. No.','Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
@@ -232,14 +229,11 @@ for kk = 1:(Nmax-Nmin+1)
     end
 end
 
-% display the results table accumulated over all runs
-resultsTable = cell2table(tableRows,'VariableNames',tableVariableNames);
-disp(resultsTable)
 
 % store the results of all runs for later evaluation
-save('Nlink_benchmark_results.mat', ...
-    'seqSolverStructs_regularization','seqSolverStructs_hessApprox2', ...
-    'seqSolverStructs_badInit','cdSolverStructs','tableRows','tableVariableNames')
+% save('Nlink_benchmark_results.mat', ...
+%     'seqSolverStructs_regularization','seqSolverStructs_hessApprox2', ...
+%     'seqSolverStructs_badInit','cdSolverStructs','tableRows','tableVariableNames')
 
 
 %% Evaluation 
@@ -363,6 +357,12 @@ solverNames{end} = 'Coordinate-descent';
 % evaluate the stored test data: shifted geometric means and the
 % performance profile plots (legend labels passed as inputs)
 plotPerformanceProfiles(seqMethodStructs, cdSolverStructs, solverNames, commonOpts.maxSolveTime, probNames)
+
+
+% display the results table accumulated over all runs
+resultsTable = cell2table(tableRows,'VariableNames',tableVariableNames);
+disp(resultsTable)
+
 
 % remove the added folders from the path again now that the benchmarks
 % are done (exactly the folders added at the top of this script)

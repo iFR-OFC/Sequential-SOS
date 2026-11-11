@@ -71,12 +71,13 @@ sos = struct('x',[V;b],...            % decision variables
     'p',[s1;s2;s3;s4;kappa]);  % parameter
 
 % SOS constraints
-sos.('g') = [V-l;
-            b - 1e-6;
-            s1*(V-b) - nabla(V,x)*subs(f,u,kappa);
-            s2*(V-b) + kappa - umin;
-            s3*(V-b) + umax - kappa;
-            s4*(V-b) - g
+sos.('g') = [
+             V-l;
+             b - 1e-6;
+             s1*(V-b) - nabla(V,x)*subs(f,u,kappa);
+             s2*(V-b) + kappa - umin;
+             s3*(V-b) + umax - kappa;
+             s4*(V-b) - g
             ];
 
 % states + constraint cones
@@ -135,7 +136,7 @@ eval_gradLag  =  casos.Function('f',{sos_x,lam_gs}, { norm(jacobian( poly2basis(
 % inf. norm of constraints (for scaled termination criterion)
 eval_gradLag_inf_norm  =  casos.Function('f',{sos_x,lam_gs}, { norm(poly2basis(casos.PS(dot(lam_gs,g_common))),inf) });
 
-% cost function of the V-step (needed to evaluate the cost at the zeroth
+% cost function of the V-step (needed to evaluate the cost at the zeroth iteration)
 eval_cost = casos.Function('f',{sos_x}, { cost });
 
 totalBuildTime = toc(startBuildTime);
@@ -344,7 +345,7 @@ for iter = 2:maxIter+1
 
     end
 
-    % only check if we did not run the bisection to get a feasible intial
+    % only check if we did not run the bisection to get a feasible initial
     % guess
     if ~useBisection
 
@@ -442,7 +443,7 @@ fprintf('-----------------------------------------------------------------------
 if strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && solved == 1
     fprintf('Solution status: Optimal solution found\n')
 elseif solved == 2
-    fprintf('Solution status: Abort midway. Solved to feasible point, but did not reach KKT points\n')
+    fprintf('Solution status: Abort midway. Solved to feasible point, but did not reach KKT point\n')
 elseif solved == 3
     fprintf('Solution status: Maximum number of iterations reached. Solved, but needs furter checks. \n')
 else

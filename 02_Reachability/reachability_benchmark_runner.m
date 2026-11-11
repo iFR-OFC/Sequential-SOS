@@ -27,6 +27,7 @@ clear
 clc
 
 
+% set MATLAB threads to 1
 maxNumCompThreads(1);
 
 % add the problem specific folders and the shared helper functions
@@ -41,12 +42,12 @@ for ii = 1:numel(addPaths)
 end
 
 % enable plotting of convergence for each run
-enable_plot_convergence  = false;
-enable_second_sequential = false;
+enable_plot_convergence  = true;
+enable_second_sequential = true;
 
 % Hessian estimation methods of the sequential solver to compare
 hess_est_method_1 = 'regularization'; % our default (see also sequentialCommon.m)
-hess_est_method_2 = 'mirroring';      % 'BFGS', 'levenberg', 'mirroring'
+hess_est_method_2 = 'BFGS';      % 'BFGS', 'levenberg', 'mirroring'
 
 % common options shared by the methods
 commonOpts.maxiter       = 500;
@@ -102,13 +103,15 @@ probNames                       = {}; % problem name per run (for the evaluation
 %% VDP
 
 % define the problem instances based on different polynomial degrees
-degV = {0:2 , 0:4};
-degK = {0:1 , 0:4};
+degV = {0:2 , 2:4, 0:4};
+degK = {0:1 , 2:4, 0:4};
+
 
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
     probStruct_VDP = generateVDP_probStruct(degV{kk},degK{kk});
+
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('Reachbility Analysis Benchmark for %s Instance %d of %d. \n', probStruct_VDP.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
@@ -118,14 +121,10 @@ for kk = 1:numel(degV)
 
     % solve VDP example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
-    solStruct_seq_VDP_regularization = solve_reachability_seq_bench_fun(probStruct_VDP,commonOpts,x0,hess_est_method);
-
-    % just some gap in display output
-    fprintf('\n')
-    fprintf('\n')
-    fprintf('\n')
-    fprintf('\n')
-
+    solStruct_seq_VDP_regularization = solve_reachability_seq_bench_fun(probStruct_VDP, ...
+                                                                        commonOpts, ...
+                                                                        x0, ...
+                                                                        hess_est_method);
 
     seqSolverStructs_regularization{end+1} = solStruct_seq_VDP_regularization;
 
@@ -135,10 +134,21 @@ for kk = 1:numel(degV)
     evalSequentialStruct_VDP_regularization.hess_est_method = hess_est_method_1;
     evalSequentialStruct_VDP_regularization.probNumber      = kk;
 
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
     if enable_second_sequential
 
         hess_est_method = hess_est_method_2;
-        solStruct_seq_VDP_hessApprox2 = solve_reachability_seq_bench_fun(probStruct_VDP,commonOpts,x0,hess_est_method);
+        solStruct_seq_VDP_hessApprox2 = solve_reachability_seq_bench_fun(probStruct_VDP, ...
+                                                                         commonOpts, ...
+                                                                         x0, ...
+                                                                         hess_est_method);
+
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_VDP_hessApprox2;
 
         % just some gap in display output
         fprintf('\n')
@@ -146,17 +156,17 @@ for kk = 1:numel(degV)
         fprintf('\n')
         fprintf('\n')
 
-
-        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_VDP_hessApprox2;
-
         % extract size and timing statistic from sequential
-        evalSequentialStruct_VDP_hessApprox2 = evalSequential(solStruct_seq_VDP_hessApprox2);
+        evalSequentialStruct_VDP_hessApprox2                 = evalSequential(solStruct_seq_VDP_hessApprox2);
         evalSequentialStruct_VDP_hessApprox2.hess_est_method = hess_est_method_2;
-        evalSequentialStruct_VDP_hessApprox2.probNumber = kk;
+        evalSequentialStruct_VDP_hessApprox2.probNumber      = kk;
     end
 
     % solve VDP example with two states using custom coordinate-descent
     solStruct_CD_VDP = solve_reachability_CD_bench_fun(probStruct_VDP,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_VDP;
+    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_VDP.Name, kk, numel(degV));
 
     % just some gap in display output
     fprintf('\n')
@@ -164,34 +174,38 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
-
-    cdSolverStructs{end+1} = solStruct_CD_VDP;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_VDP.Name, kk, numel(degV));
-
     % append the current run to the accumulating results table
     if enable_second_sequential
-        tableRows = appendResultRow(tableRows,probStruct_VDP,solStruct_CD_VDP, ...
-            solStruct_seq_VDP_regularization,solStruct_seq_VDP_hessApprox2,true);
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_VDP, ...
+                                    solStruct_CD_VDP, ...
+                                    solStruct_seq_VDP_regularization, ...
+                                    solStruct_seq_VDP_hessApprox2, ...
+                                    true);
     else
-        tableRows = appendResultRow(tableRows,probStruct_VDP,solStruct_CD_VDP, ...
-            solStruct_seq_VDP_regularization,[],true);
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_VDP, ...
+                                    solStruct_CD_VDP, ...
+                                    solStruct_seq_VDP_regularization, ...
+                                    [], ...
+                                    true);
     end
 
     if enable_plot_convergence
         if enable_second_sequential
             % Evaluate
-            plotConvergence(probStruct_VDP, ...
-                enable_second_sequential,...
-                evalSequentialStruct_VDP_regularization,...
-                evalSequentialStruct_VDP_hessApprox2,...
-                solStruct_CD_VDP)
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_VDP_regularization,...
+                            evalSequentialStruct_VDP_hessApprox2,...
+                            solStruct_CD_VDP)
         else
             % Evaluate
-            plotConvergence(probStruct_VDP, ...
-                enable_second_sequential,...
-                evalSequentialStruct_VDP_regularization,...
-                [],...
-                solStruct_CD_VDP)
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_VDP_regularization,...
+                            [],...
+                            solStruct_CD_VDP)
         end
     end
 end
@@ -221,7 +235,17 @@ solverNames{end} = 'Coordinate-descent';
 
 % evaluate the stored test data: shifted geometric means and the
 % performance profile plots (legend labels passed as inputs)
-plotPerformanceProfiles(seqMethodStructs, cdSolverStructs, solverNames, commonOpts.maxSolveTime, probNames)
+plotPerformanceProfiles(seqMethodStructs, ...
+                        cdSolverStructs, ...
+                        solverNames, ...
+                        commonOpts.maxSolveTime, ...
+                        probNames)
+
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
+
 
 % remove the added folders from the path again now that the benchmarks
 % are done (exactly the folders added at the top of this script)

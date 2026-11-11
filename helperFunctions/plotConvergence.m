@@ -1,4 +1,4 @@
-function [] = plotConvergence(problemStruct, ...
+function [] = plotConvergence(probName, ...
                               enable_second_sequential,...
                               evalSequentialStruct,...
                               evalSequentialStruct_hessApprox2,...
@@ -6,7 +6,7 @@ function [] = plotConvergence(problemStruct, ...
 
 
 % Plot convergence diagnostics
-figure('Name',[problemStruct.Name ' Benchmark run ' num2str(evalSequentialStruct.probNumber) ])
+figure('Name',probName)
 tiledlayout(1,2)
 nexttile
 semilogy(0:evalSequentialStruct.iterations,evalSequentialStruct.scaled_d_ldx,'-*','LineWidth',1.2), grid on, title('Cost'), hold on,
@@ -15,8 +15,7 @@ if enable_second_sequential
     semilogy(0:evalSequentialStruct_hessApprox2.iterations,evalSequentialStruct_hessApprox2.scaled_d_ldx,'-o','LineWidth',1.2), hold on,
 end
 
-% coordinate descent is optional (not implemented for every benchmark,
-% e.g. CBF-CLF); pass [] as solStruct_CD to skip its curve
+% coordinate-descent
 if ~isempty(solStruct_CD)
     semilogy(0:solStruct_CD.stats.iterations,solStruct_CD.stats.nabla_L_scaled,'-+','LineWidth',1.2), hold on,
 end

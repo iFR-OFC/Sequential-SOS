@@ -26,12 +26,12 @@ for ii = 1:numel(addPaths)
 end
 
 % enable plotting of convergence for each run
-enable_plot_convergence  = false;
+enable_plot_convergence  = true;
 enable_second_sequential = false;
 
 % Hessian estimation methods of the sequential solver to compare
 hess_est_method_1 = 'regularization'; % our default (see also sequentialCommon.m)
-hess_est_method_2 = 'mirroring';      % 'BFGS', 'levenberg', 'mirroring'
+hess_est_method_2 = 'BFGS';      % 'BFGS', 'levenberg', 'mirroring'
 
 % common options shared by the methods
 commonOpts.maxiter       = 500;
@@ -47,8 +47,8 @@ if strcmpi(commonOpts.solver,'mosek')
     commonOpts.sdp_solver_opts.mosek_echo  = 0;
 
 elseif strcmpi(commonOpts.solver,'clarabel')
-        commonOpts.sdp_solver_opts.direct_solve_method =  'FAER';
-        commonOpts.sdp_solver_opts.verbose             = 0;
+    commonOpts.sdp_solver_opts.direct_solve_method =  'FAER';
+    commonOpts.sdp_solver_opts.verbose             = 0;
 elseif strcmpi(commonOpts.solver,'scs')
     commonOpts.sdp_solver_opts.dense               = 1;
     commonOpts.sdp_solver_opts.verbose             = 0;
@@ -91,10 +91,12 @@ degV = {2,2,2:4};
 degH = {2,2:4,2};
 degK = {1,1:2,1:2};
 
+
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
     probStruct_Satellite = generateSatellite_probStruct(degV{kk},degH{kk},degK{kk});
+
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('CBF-CLF Benchmark for %s Instance %d of %d. \n', probStruct_Satellite.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
@@ -104,14 +106,10 @@ for kk = 1:numel(degV)
 
     % solve Satellite example using sequential SOS
     hess_est_method = hess_est_method_1;
-    solStruct_seq_Satellite_regularization = solve_CbfClf_seq_bench_fun(probStruct_Satellite,commonOpts,x0,hess_est_method);
-
-    % just some gap in display output
-    fprintf('\n')
-    fprintf('\n')
-    fprintf('\n')
-    fprintf('\n')
-
+    solStruct_seq_Satellite_regularization = solve_CbfClf_seq_bench_fun(probStruct_Satellite, ...
+                                                                        commonOpts, ...
+                                                                        x0, ...
+                                                                        hess_est_method);
 
     seqSolverStructs_regularization{end+1} = solStruct_seq_Satellite_regularization;
 
@@ -120,31 +118,7 @@ for kk = 1:numel(degV)
     evalSequentialStruct_Satellite_regularization                 = evalSequential(solStruct_seq_Satellite_regularization);
     evalSequentialStruct_Satellite_regularization.hess_est_method = hess_est_method_1;
     evalSequentialStruct_Satellite_regularization.probNumber      = kk;
-
     evalSequentialStruct_Satellite_hessApprox2 = [];
-
-    if enable_second_sequential
-
-        hess_est_method = hess_est_method_2;
-        solStruct_seq_Satellite_hessApprox2 = solve_CbfClf_seq_bench_fun(probStruct_Satellite,commonOpts,x0,hess_est_method);
-
-        % just some gap in display output
-        fprintf('\n')
-        fprintf('\n')
-        fprintf('\n')
-        fprintf('\n')
-
-
-        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Satellite_hessApprox2;
-
-        % extract size and timing statistic from sequential
-        evalSequentialStruct_Satellite_hessApprox2 = evalSequential(solStruct_seq_Satellite_hessApprox2);
-        evalSequentialStruct_Satellite_hessApprox2.hess_est_method = hess_est_method_2;
-        evalSequentialStruct_Satellite_hessApprox2.probNumber = kk;
-    end
-
-    % solve Satellite example using custom coordinate-descent
-    solStruct_CD_Satellite = solve_CbfClf_CD_bench_fun(probStruct_Satellite,commonOpts,x0);
 
     % just some gap in display output
     fprintf('\n')
@@ -152,34 +126,72 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    if enable_second_sequential
+
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_Satellite_hessApprox2 = solve_CbfClf_seq_bench_fun(probStruct_Satellite, ...
+                                                                         commonOpts, ...
+                                                                         x0, ...
+                                                                         hess_est_method);
+
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Satellite_hessApprox2;
+
+        % just some gap in display output
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_Satellite_hessApprox2                 = evalSequential(solStruct_seq_Satellite_hessApprox2);
+        evalSequentialStruct_Satellite_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_Satellite_hessApprox2.probNumber      = kk;
+    end
+
+    % solve Satellite example using custom coordinate-descent
+    solStruct_CD_Satellite = solve_CbfClf_CD_bench_fun(probStruct_Satellite,commonOpts,x0);
 
     cdSolverStructs{end+1} = solStruct_CD_Satellite;
     probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Satellite.Name, kk, numel(degV));
 
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
     % append the current run to the accumulating results table
     if enable_second_sequential
-        tableRows = appendResultRow(tableRows,probStruct_Satellite,solStruct_CD_Satellite, ...
-            solStruct_seq_Satellite_regularization,solStruct_seq_Satellite_hessApprox2,true);
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_Satellite, ...
+                                    solStruct_CD_Satellite, ...
+                                    solStruct_seq_Satellite_regularization, ...
+                                    solStruct_seq_Satellite_hessApprox2, ...
+                                    true);
     else
-        tableRows = appendResultRow(tableRows,probStruct_Satellite,solStruct_CD_Satellite, ...
-                                    solStruct_seq_Satellite_regularization,[],true);
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_Satellite, ...
+                                    solStruct_CD_Satellite, ...
+                                    solStruct_seq_Satellite_regularization, ...
+                                    [], ...
+                                    true);
     end
 
     if enable_plot_convergence
         if enable_second_sequential
-        % Evaluate
-        plotConvergence(probStruct_Satellite, ...
-                        enable_second_sequential,...
-                        evalSequentialStruct_Satellite_regularization,...
-                        evalSequentialStruct_Satellite_hessApprox2,...
-                        solStruct_CD_Satellite)
+            % Evaluate
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_Satellite_regularization,...
+                            evalSequentialStruct_Satellite_hessApprox2,...
+                            solStruct_CD_Satellite)
         else
             % Evaluate
-            plotConvergence(probStruct_Satellite, ...
-                enable_second_sequential,...
-                evalSequentialStruct_Satellite_regularization,...
-                [],...
-                solStruct_CD_Satellite)
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_Satellite_regularization,...
+                            [],...
+                            solStruct_CD_Satellite)
         end
     end
 end
@@ -216,7 +228,11 @@ solverNames{end} = 'Coordinate-descent';
 
 % evaluate the stored test data: shifted geometric means and the
 % performance profile plots (legend labels passed as inputs)
-plotPerformanceProfiles(seqMethodStructs, cdSolverStructs, solverNames, commonOpts.maxSolveTime, probNames)
+plotPerformanceProfiles(seqMethodStructs, ...
+                        cdSolverStructs, ...
+                        solverNames, ...
+                        commonOpts.maxSolveTime, ...
+                        probNames)
 
 % remove the added folders from the path again now that the benchmarks
 % are done (exactly the folders added at the top of this script)
