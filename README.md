@@ -11,7 +11,8 @@ This repository cotains the scripts to reproduce the benchmarks.
 The benchmarks itself does not not need to be installed. Only a [stable version](https://github.com/ifr-acso/casos/releases/latest) of CaΣoS, [MOSEK](https://www.mosek.com/downloads/) v11.1 is needed and CasADi v3.7.2 are required. 
 
   1. For reproduction use MATLAB 26.1.0.3346908 (R2026a) Update 5
-  >**Note**
+  
+  **Note**
   > If other MATLAB releases are used, this might result in different results. Therefore, for reproduction follow these guidelines! 
   2. Download CasADi v3.7.2 and add it to your Matlab path.
   3. Download and install MOSEK v11.2.7, and add the solver to the Matlab path.
