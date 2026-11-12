@@ -45,6 +45,7 @@ casadiVersion = casadi.CasadiMeta.version;
 runnerDir = pwd;
 addPaths  = { ...
     fullfile(runnerDir,'VDP'), ...
+    fullfile(runnerDir,'Jet-Engine/'), ...
     fullfile(runnerDir,'MultiInput'), ...
     fullfile(runnerDir,'DoublePendulum'), ...
     fullfile(runnerDir,'Aircraft'), ...
@@ -59,7 +60,7 @@ end
 
 % enable plotting of convergence for each run
 enable_plot_convergence  = true;
-enable_second_sequential = true;
+enable_second_sequential = false;
 
 % Hessian estimation methods of the sequential solver to compare
 hess_est_method_1 = 'regularization'; % our default (see also sequentialCommon.m)
@@ -69,7 +70,7 @@ hess_est_method_2 = 'levenberg';      % 'BFGS', 'levenberg', 'mirroring'
 commonOpts.maxiter       = 500;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
-commonOpts.solver        = 'clarabel';
+commonOpts.solver        = 'mosek';
 commonOpts.miniter       = 5; % minimum iterations before an aborted CD run still counts as successful
 
 % MOSEK settings

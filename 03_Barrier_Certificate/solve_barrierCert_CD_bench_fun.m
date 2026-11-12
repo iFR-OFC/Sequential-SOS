@@ -139,6 +139,10 @@ totalBuildTime = toc(startBuildTime);
 
 %% Preparation
 
+startSolve_mainLoop = tic;
+
+
+start_init_time = tic;
 % initial guess [B;kappa;b] (same ordering as in x0)
 sol2_x = [x0(1);
          x0(end)];
@@ -204,14 +208,17 @@ fprintf('%-8d%-15g%-15g\n',0,cost_CD(1),nabla_L(1));
 
 buildBisecTime = 0;
 solveBisecTime  = 0;
+meas_time_kkt = 0;
 solved = 1;
+
+init_time = toc(start_init_time);
 
 %% Main-loop (B-s-iteration)
 % real k-th iteration runs at iter = k+1 (cf. sequential)
 
 maxIter = commonOpts.maxiter;
 
-startSolve_mainLoop = tic;
+
 for iter = 2:maxIter+1
 
 
@@ -346,6 +353,7 @@ for iter = 2:maxIter+1
     % guess
     if ~useBisection
 
+        eval_kkt_con_start = tic;
 
         % lam of s2,s3,s4 (s2,s3 are nu-vectors) from S1, rest from S2
         if s1_ok
@@ -373,6 +381,11 @@ for iter = 2:maxIter+1
         % inf. norm of lambda*constraint(s)
         inf_g   = full(eval_gradLag_inf_norm(sol_x_it,lam_gs_it));
 
+        % just for plotting
+        nabla_L_scaled(iter) = nabla_L(iter)*inf_delta_x/(max(1,abs(full(sol2.f)) + inf_g ));
+
+        meas_time_kkt(iter) = toc(eval_kkt_con_start);
+
         % display output header every 10th iteration
         if ~mod(iter-1,10) && iter-1 > 0
             fprintf('%-8s%-15s%-15s\n','iter','obj','||dLdx||');
@@ -381,9 +394,6 @@ for iter = 2:maxIter+1
 
         % display output current iterate
         fprintf('%-8d%-15g%-15g\n',iter-1,cost_CD(iter),nabla_L(iter));
-
-        % just for plotting
-        nabla_L_scaled(iter) = nabla_L(iter)*inf_delta_x/(max(1,abs(full(sol2.f)) + inf_g ));
 
         % scaled termination criterion
         if nabla_L(iter) <= commonOpts.tolerance_opt*(max(1,abs(full(sol2.f)) + inf_g ))/inf_delta_x
@@ -478,6 +488,8 @@ stats.initial_guess_trials  = initial_guess_trials;
 
 stats.totalSolveTime     = totalSolveTime;
 stats.totalBuildTime     = totalBuildTime + buildBisecTime;
+stats.init_time          = init_time;
+stats.eval_kkt_time      = sum(meas_time_kkt);
 stats.time_per_iteration = stats.totalSolveTime / stats.iterations;
 
 % write to struct

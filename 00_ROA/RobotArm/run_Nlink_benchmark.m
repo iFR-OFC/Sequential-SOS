@@ -45,7 +45,7 @@ enable_plot_convergence = true;
 enable_second_sequential = false;
 
 % run sequential additionally with a clearly infeasible initial guess
-enable_seq_badInit = false;
+enable_seq_badInit = true;
 
 % set to true to generate tikz figure using MATLAB2TIKZ
 genTikz = false;
@@ -64,15 +64,17 @@ commonOpts.miniter       = 5; % minimum iterations before an aborted CD run stil
 % MOSEK settings
 
 if strcmpi(commonOpts.solver,'mosek')
-    commonOpts.sdp_solver_opts.mosek_param = struct( ...
-        'MSK_IPAR_NUM_THREADS',            0); 
+    commonOpts.sdp_solver_opts.mosek_param = struct('MSK_IPAR_NUM_THREADS',1); 
     commonOpts.sdp_solver_opts.mosek_echo = 0;
 
 
 elseif strcmpi(commonOpts.solver,'clarabel')
+
         commonOpts.sdp_solver_opts.direct_solve_method =  'FAER';
         commonOpts.sdp_solver_opts.verbose             = 0;
+
 elseif strcmpi(commonOpts.solver,'scs')
+
     commonOpts.sdp_solver_opts.dense               = 1;
     commonOpts.sdp_solver_opts.verbose             = 0;
 end
@@ -83,7 +85,7 @@ deg    = 2;
 
 % number of links: the robot arm has 2*N states
 Nmin   = 2;
-Nmax   = 8;  % n = 2*N
+Nmax   = 6;  % n = 2*N
 
 % variable names of the results table (one row per run)
 tableVariableNames = {'Prob. No.','Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
@@ -220,7 +222,7 @@ for kk = 1:(Nmax-Nmin+1)
                         solStruct_CD_Nlink)
         else
             % Evaluate
-            plotConvergence(probStruct_Nlink, ...
+            plotConvergence(probNames{kk}, ...
                 enable_second_sequential,...
                 evalSequentialStruct_Nlink_regularization,...
                 [],...
