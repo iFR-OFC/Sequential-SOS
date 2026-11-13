@@ -37,15 +37,18 @@ clc
 maxNumCompThreads(1);
 
 
+date_of_benchmark = string(datetime("today","Format","dd-MMM-yyyy"));
+name_of_benchmark = 'ROA_benchmark';
+
 % get versions
 matlabVersion = version;
 casadiVersion = casadi.CasadiMeta.version;
+
 
 % add the problem specific folders and the shared helper functions
 runnerDir = pwd;
 addPaths  = { ...
     fullfile(runnerDir,'VDP'), ...
-    fullfile(runnerDir,'Jet-Engine/'), ...
     fullfile(runnerDir,'MultiInput'), ...
     fullfile(runnerDir,'DoublePendulum'), ...
     fullfile(runnerDir,'Aircraft'), ...
@@ -60,7 +63,7 @@ end
 
 % enable plotting of convergence for each run
 enable_plot_convergence  = true;
-enable_second_sequential = false;
+enable_second_sequential = true;
 
 % Hessian estimation methods of the sequential solver to compare
 hess_est_method_1 = 'regularization'; % our default (see also sequentialCommon.m)
@@ -70,7 +73,8 @@ hess_est_method_2 = 'levenberg';      % 'BFGS', 'levenberg', 'mirroring'
 commonOpts.maxiter       = 500;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
-commonOpts.solver        = 'mosek';
+commonOpts.almost_opt_count = 10;
+commonOpts.solver        = 'clarabel';
 commonOpts.miniter       = 5; % minimum iterations before an aborted CD run still counts as successful
 
 % MOSEK settings
@@ -189,7 +193,7 @@ for kk = 1:numel(degV)
     solStruct_CD_VDP = solve_ROA_CD_bench_fun(probStruct_VDP,commonOpts,x0);
 
     cdSolverStructs{end+1} = solStruct_CD_VDP;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_VDP.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_VDP.Name, kk, numel(degV),commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -649,7 +653,7 @@ for kk = 1:numel(degV)
     solStruct_CD_Satellite = solve_ROA_CD_bench_fun(probStruct_Satellite,commonOpts,x0);
 
     cdSolverStructs{end+1} = solStruct_CD_Satellite;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Satellite.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with )', probStruct_Satellite.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -920,8 +924,36 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 
 
+%% Store benchmark data
+
+fprintf('\n')
+fprintf('Store benchmark data in .mat file\n')
+fprintf('\n')
+
+save([name_of_benchmark '_' commonOpts.solver '.mat'],...         % name of .mat files
+     "name_of_benchmark",... 
+     'casadiVersion',...                    % store the used casadi version
+     'date_of_benchmark',...                % date when the benchmark was generated
+     'matlabVersion',...                    % store the matlab version
+     'probNames',...                        % names for each run
+     'cdSolverStructs',...                  % struct containing stats and solution for CD
+     'seqSolverStructs_hessApprox2',...     % struct containing stats and solution for the sequential with alternative hessian estimation
+     'seqSolverStructs_regularization',...  % struct containing stats and solution for the sequential with default hessian estimation
+     'commonOpts',...                       % shared options
+     'enable_second_sequential', ...        % flag to enable second sequential run with alternative hessian approx
+     'enable_plot_convergence', ...         % flag to enable plot of convergence
+     'hess_est_method_1', ...               % default hessian estimation method (needed as string for plotting)
+     'hess_est_method_2', ...               % second hessian estimation method
+     'tableRows', ...                       % table with result
+     'tableVariableNames')                  % column names for table
+
+fprintf('\n')
+
 %% Performance Profile (Dolan & More, Math. Program. 91, 2002)
 
+
+fprintf('Evaluate benchmark ... \n')
+fprintf('\n')
 % sequential runs stored per Hessian estimation method (cf. hess_est_method)
 seqMethodStructs = {seqSolverStructs_regularization};
 seqMethodNames   = {hess_est_method_1};
@@ -933,9 +965,9 @@ end
 % solver names: one sequential solver per Hessian estimation method plus coordinate descent
 solverNames = cell(1, numel(seqMethodNames) + 1);
 for s = 1:numel(seqMethodNames)
-    solverNames{s} = ['Sequential (' seqMethodNames{s} ')'];
+    solverNames{s} = ['Sequential (' seqMethodNames{s} ', ' commonOpts.solver ')'];
 end
-solverNames{end} = 'Coordinate-descent';
+solverNames{end} = ['Coordinate-descent',' (' commonOpts.solver ')'];
 
 % evaluate the stored test data: shifted geometric means and the
 % performance profile plots (legend labels passed as inputs)

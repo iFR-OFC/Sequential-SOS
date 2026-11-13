@@ -26,8 +26,15 @@ close all
 clear
 clc
 
-
+% set MATLAB threads to 1
 maxNumCompThreads(1);
+
+date_of_benchmark = string(datetime("today","Format","dd-MMM-yyyy"));
+name_of_benchmark = 'barrierCert_benchmark';
+
+% get versions
+matlabVersion = version;
+casadiVersion = casadi.CasadiMeta.version;
 
 % add the problem specific folders and the shared helper functions
 runnerDir = pwd;
@@ -51,27 +58,33 @@ enable_second_sequential = false;
 
 % Hessian estimation methods of the sequential solver to compare
 hess_est_method_1 = 'regularization'; % our default (see also sequentialCommon.m)
-hess_est_method_2 = 'mirroring';      % 'BFGS', 'levenberg', 'mirroring'
+hess_est_method_2 = 'BFGS';      % 'BFGS', 'levenberg', 'mirroring'
 
 % common options shared by the methods
 commonOpts.maxiter       = 500;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
+commonOpts.almost_opt_count = 10;
 commonOpts.solver        = 'mosek';
 commonOpts.miniter       = 5; % minimum iterations before an aborted CD run still counts as successful
 
 % MOSEK settings
 
 if strcmpi(commonOpts.solver,'mosek')
+
     commonOpts.sdp_solver_opts.mosek_param = struct( 'MSK_IPAR_NUM_THREADS', 1); 
     commonOpts.sdp_solver_opts.mosek_echo  = 0;
 
 elseif strcmpi(commonOpts.solver,'clarabel')
+
     commonOpts.sdp_solver_opts.direct_solve_method =  'FAER';
     commonOpts.sdp_solver_opts.verbose             = 0;
+
 elseif strcmpi(commonOpts.solver,'scs')
+
     commonOpts.sdp_solver_opts.dense               = 1;
     commonOpts.sdp_solver_opts.verbose             = 0;
+
 end
 
 
@@ -447,150 +460,6 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 
 
-%% Pendubot
-% 
-% % define the problem instances based on different polynomial degrees
-% degV = {2  , 2, 2:4};
-% degK = {1, 1:2, 1:2};
-% 
-% 
-% for kk = 1:numel(degV)
-% 
-%     % generate problem structure (dynamics, polynomial dec. variables)
-%     probStruct_Pendubot = generatePendubot_probStruct(degV{kk},degK{kk});
-%     fprintf('------------------------------------------------------------------------------------------ \n')
-%     fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_Pendubot.Name, kk, numel(degV))
-%     fprintf('------------------------------------------------------------------------------------------\n')
-% 
-%     % generate an initial guess
-%     x0 = generate_initGuess_Pendubot(probStruct_Pendubot);
-% 
-%     % solve Pendubot example with two states using sequential SOS
-%     hess_est_method = hess_est_method_1;
-%     solStruct_seq_Pendubot_regularization = solve_barrierCert_seq_bench_fun(probStruct_Pendubot,commonOpts,x0,hess_est_method);
-% 
-%     seqSolverStructs_regularization{end+1} = solStruct_seq_Pendubot_regularization;
-% 
-%     % extract size and timing statistic from sequential and add some meta
-%     % data for plotting
-%     evalSequentialStruct_Pendubot_regularization                 = evalSequential(solStruct_seq_Pendubot_regularization);
-%     evalSequentialStruct_Pendubot_regularization.hess_est_method = hess_est_method_1;
-%     evalSequentialStruct_Pendubot_regularization.probNumber      = kk;
-% 
-%     if enable_second_sequential
-% 
-%         hess_est_method = hess_est_method_2;
-%         solStruct_seq_Pendubot_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_Pendubot,commonOpts,x0,hess_est_method);
-% 
-%         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Pendubot_hessApprox2;
-% 
-%         % extract size and timing statistic from sequential
-%         evalSequentialStruct_Pendubot_hessApprox2 = evalSequential(solStruct_seq_Pendubot_hessApprox2);
-%         evalSequentialStruct_Pendubot_hessApprox2.hess_est_method = hess_est_method_2;
-%         evalSequentialStruct_Pendubot_hessApprox2.probNumber = kk;
-%     end
-% 
-%     % solve Pendubot example with two states using custom coordinate-descent
-%     solStruct_CD_Pendubot = solve_barrierCert_CD_bench_fun(probStruct_Pendubot,commonOpts,x0);
-% 
-%     cdSolverStructs{end+1} = solStruct_CD_Pendubot;
-%     probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Pendubot.Name, kk, numel(degV));
-% 
-%     % append the current run to the accumulating results table
-%     if enable_second_sequential
-%         tableRows = appendResultRow(tableRows,probStruct_Pendubot,solStruct_CD_Pendubot, ...
-%             solStruct_seq_Pendubot_regularization,solStruct_seq_Pendubot_hessApprox2,true);
-%     else
-%         tableRows = appendResultRow(tableRows,probStruct_Pendubot,solStruct_CD_Pendubot, ...
-%             solStruct_seq_Pendubot_regularization,[],true);
-%     end
-% 
-%     if enable_plot_convergence
-%         % Evaluate
-%         plotConvergence(probStruct_Pendubot, ...
-%             enable_second_sequential,...
-%             evalSequentialStruct_Pendubot_regularization,...
-%             evalSequentialStruct_Pendubot_hessApprox2,...
-%             solStruct_CD_Pendubot)
-%     end
-% end
-% 
-% % display the results table accumulated over all runs so far
-% disp(cell2table(tableRows,'VariableNames',tableVariableNames))
-
-
-%% Copter
-% 
-% % define the problem instances based on different polynomial degrees
-% degV = {2  , 2:4, 1:4};
-% degK = {1:2, 1:2, 1:2};
-% 
-% 
-% for kk = 1:numel(degV)
-% 
-%     % generate problem structure (dynamics, polynomial dec. variables)
-%     probStruct_Copter = generateCopter_probStruct(degV{kk},degK{kk});
-%     fprintf('------------------------------------------------------------------------------------------ \n')
-%     fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_Copter.Name, kk, numel(degV))
-%     fprintf('------------------------------------------------------------------------------------------\n')
-% 
-%     % generate an initial guess
-%     x0 = generate_initGuess_Copter(probStruct_Copter);
-% 
-%     % solve Copter example with two states using sequential SOS
-%     hess_est_method = hess_est_method_1;
-%     solStruct_seq_Copter_regularization = solve_barrierCert_seq_bench_fun(probStruct_Copter,commonOpts,x0,hess_est_method);
-% 
-%     seqSolverStructs_regularization{end+1} = solStruct_seq_Copter_regularization;
-% 
-%     % extract size and timing statistic from sequential and add some meta
-%     % data for plotting
-%     evalSequentialStruct_Copter_regularization                 = evalSequential(solStruct_seq_Copter_regularization);
-%     evalSequentialStruct_Copter_regularization.hess_est_method = hess_est_method_1;
-%     evalSequentialStruct_Copter_regularization.probNumber      = kk;
-% 
-%     if enable_second_sequential
-% 
-%         hess_est_method = hess_est_method_2;
-%         solStruct_seq_Copter_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_Copter,commonOpts,x0,hess_est_method);
-% 
-%         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Copter_hessApprox2;
-% 
-%         % extract size and timing statistic from sequential
-%         evalSequentialStruct_Copter_hessApprox2 = evalSequential(solStruct_seq_Copter_hessApprox2);
-%         evalSequentialStruct_Copter_hessApprox2.hess_est_method = hess_est_method_2;
-%         evalSequentialStruct_Copter_hessApprox2.probNumber = kk;
-%     end
-% 
-%     % solve Copter example with two states using custom coordinate-descent
-%     solStruct_CD_Copter = solve_barrierCert_CD_bench_fun(probStruct_Copter,commonOpts,x0);
-% 
-%     cdSolverStructs{end+1} = solStruct_CD_Copter;
-%     probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Copter.Name, kk, numel(degV));
-% 
-%     % append the current run to the accumulating results table
-%     if enable_second_sequential
-%         tableRows = appendResultRow(tableRows,probStruct_Copter,solStruct_CD_Copter, ...
-%             solStruct_seq_Copter_regularization,solStruct_seq_Copter_hessApprox2,true);
-%     else
-%         tableRows = appendResultRow(tableRows,probStruct_Copter,solStruct_CD_Copter, ...
-%             solStruct_seq_Copter_regularization,[],true);
-%     end
-% 
-%     if enable_plot_convergence
-%         % Evaluate
-%         plotConvergence(probStruct_Copter, ...
-%             enable_second_sequential,...
-%             evalSequentialStruct_Copter_regularization,...
-%             evalSequentialStruct_Copter_hessApprox2,...
-%             solStruct_CD_Copter)
-%     end
-% end
-% 
-% % display the results table accumulated over all runs so far
-% disp(cell2table(tableRows,'VariableNames',tableVariableNames))
-
-
 %% Satellite
 
 % define the problem instances based on different polynomial degrees
@@ -705,15 +574,36 @@ end
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 
-%% Results table (all benchmarks, all runs)
 
-% final results table accumulated over all runs and all problems
-resultsTable = cell2table(tableRows,'VariableNames',tableVariableNames);
-disp(resultsTable)
+%% Store benchmark data
 
+fprintf('\n')
+fprintf('Store benchmark data in .mat file\n')
+fprintf('\n')
+
+save([name_of_benchmark '_' commonOpts.solver '.mat'],...         % name of .mat files
+     'casadiVersion',...                    % store the used casadi version
+     'date_of_benchmark',...                % date when the benchmark was generated
+     'matlabVersion',...                    % store the matlab version
+     'probNames',...                        % names for each run
+     'cdSolverStructs',...                  % struct containing stats and solution for CD
+     'seqSolverStructs_hessApprox2',...     % struct containing stats and solution for the sequential with alternative hessian estimation
+     'seqSolverStructs_regularization',...  % struct containing stats and solution for the sequential with default hessian estimation
+     'commonOpts',...                       % shared options
+     'enable_second_sequential', ...        % flag to enable second sequential run with alternative hessian approx
+     'enable_plot_convergence', ...         % flag to enable plot of convergence
+     'hess_est_method_1', ...               % default hessian estimation method (needed as string for plotting)
+     'hess_est_method_2', ...               % second hessian estimation method
+     'tableRows', ...                       % table with result
+     'tableVariableNames')                  % column names for table
+
+fprintf('\n')
 
 %% Performance Profile (Dolan & More, Math. Program. 91, 2002)
 
+
+fprintf('Evaluate benchmark ... \n')
+fprintf('\n')
 % sequential runs stored per Hessian estimation method (cf. hess_est_method)
 seqMethodStructs = {seqSolverStructs_regularization};
 seqMethodNames   = {hess_est_method_1};
@@ -726,9 +616,9 @@ end
 % (explicit loop: arrayfun/concat can produce nested cells, which fprintf rejects)
 solverNames = cell(1, numel(seqMethodNames) + 1);
 for s = 1:numel(seqMethodNames)
-    solverNames{s} = ['Sequential (' seqMethodNames{s} ')'];
+    solverNames{s} = ['Sequential (' seqMethodNames{s} ', ' commonOpts.solver ')'];
 end
-solverNames{end} = 'Coordinate-descent';
+solverNames{end} = ['Coordinate-descent',' (' commonOpts.solver ')'];
 
 % evaluate the stored test data: shifted geometric means and the
 % performance profile plots (legend labels passed as inputs)
@@ -737,6 +627,13 @@ plotPerformanceProfiles(seqMethodStructs, ...
                         solverNames, ...
                         commonOpts.maxSolveTime, ...
                         probNames)
+
+
+
+% final results table accumulated over all runs and all problems
+resultsTable = cell2table(tableRows,'VariableNames',tableVariableNames);
+disp(resultsTable)
+
 
 % remove the added folders from the path again now that the benchmarks
 % are done (exactly the folders added at the top of this script)

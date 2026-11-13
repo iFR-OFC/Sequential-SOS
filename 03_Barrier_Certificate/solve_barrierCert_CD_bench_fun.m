@@ -211,12 +211,21 @@ solveBisecTime  = 0;
 meas_time_kkt = 0;
 solved = 1;
 
+% counter until solution is marked almost optimal
+counter_almost_opt_iter    = 0;
+
+% flag to indicate that the maximum solve time was reached
+time_limit_reached = false;
+
 init_time = toc(start_init_time);
 
 %% Main-loop (B-s-iteration)
 % real k-th iteration runs at iter = k+1 (cf. sequential)
 
 maxIter = commonOpts.maxiter;
+maxTime = commonOpts.maxSolveTime;
+
+if ~isfield(commonOpts,'almost_opt_count'), commonOpts.almost_opt_count = 10; end
 
 
 for iter = 2:maxIter+1
@@ -258,16 +267,16 @@ for iter = 2:maxIter+1
         % bisection fallback uses mosek: pass its params only if configured
         if  strcmpi(commonOpts.solver,'mosek')
 
-            opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
-            opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+            opts.sossol_options.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+            opts.sossol_options.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 
         elseif strcmpi(commonOpts.solver,'clarabel')
 
-            opts.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
+            opts.sossol_options.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
 
         elseif strcmpi(commonOpts.solver,'scs')
 
-            opts.sdpsol_options.scs = commonOpts.sdp_solver_opts;
+            opts.sossol_options.sdpsol_options.scs = commonOpts.sdp_solver_opts;
 
         end
 
@@ -403,7 +412,30 @@ for iter = 2:maxIter+1
             x_prev =  sol_x_it;
         end
 
+        % check if current iterate is solved to an acceptable level
+        if nabla_L(iter) <= 10*commonOpts.tolerance_opt*(max(1,abs(full(sol2.f)) + inf_g ))/inf_delta_x
+
+            % increase counter
+            counter_almost_opt_iter = counter_almost_opt_iter +1;
+
+            % we have 5-10 in a row, seems we solved it to an acceptable level/almost optimal
+            if counter_almost_opt_iter >= commonOpts.almost_opt_count
+                solved = 4;
+                break
+            end
+        else
+            % if current iterate is not solved to an acceptable level, reset counter
+            counter_almost_opt_iter = 0;
+        end
+
     end % check if we need bisection
+
+    % at the end of the loop, check solve time
+    if toc(startSolve_mainLoop) >= maxTime && iter <= maxIter
+        % abort: maximum solve time reached
+        time_limit_reached = true;
+        break
+    end
 
 end % end for-loop (inner)
 
@@ -440,18 +472,9 @@ end
 % iterations to converge according to KKT conditions, yet, the solution
 % might be already close
 
-% we are feasible, but are not converged until max. iter
-if strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && iter >= maxIter
-    % check for progress
-    if  abs(cost_CD(1) - cost_CD(end)) > commonOpts.tolerance_opt
-
-        UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
-        solved = 3;
-
-    else
-        UNIFIED_RETURN_STATUS = 'RET_LIMITED';
-    end
-
+% we are feasible, but are not converged until max. iter or max. time
+if (strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && iter >= maxIter) || time_limit_reached
+    UNIFIED_RETURN_STATUS = 'RET_LIMITED';
 end
 % ************************************************************************
 
@@ -461,8 +484,12 @@ if strcmp(UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS') && solved == 1
     fprintf('Solution status: Optimal solution found\n')
 elseif solved == 2
     fprintf('Solution status: Abort midway. Solved to feasible point, but did not reach KKT point\n')
-elseif solved == 3
-    fprintf('Solution status: Maximum number of iterations reached. Solved, but needs further checks. \n')
+elseif solved == 4
+    fprintf('Solution status: Almost optimal.\n')
+elseif time_limit_reached
+    fprintf('Solution status: Maximum solve time reached\n')
+elseif strcmp(UNIFIED_RETURN_STATUS,'RET_LIMITED') && iter > maxIter
+    fprintf('Solution status: Maximum number of iterations reached\n')
 else
     fprintf('Solution status: Problem infeasible.\n')
 end

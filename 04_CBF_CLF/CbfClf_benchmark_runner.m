@@ -14,6 +14,13 @@ clc
 
 maxNumCompThreads(1);
 
+date_of_benchmark = string(datetime("today","Format","dd-MMM-yyyy"));
+name_of_benchmark = 'CBF_CLF_benchmark';
+
+% get versions
+matlabVersion = version;
+casadiVersion = casadi.CasadiMeta.version;
+
 % add the problem specific folders and the shared helper functions
 runnerDir = fileparts(mfilename('fullpath'));
 
@@ -37,6 +44,7 @@ hess_est_method_2 = 'BFGS';      % 'BFGS', 'levenberg', 'mirroring'
 commonOpts.maxiter       = 500;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
+commonOpts.almost_opt_count = 10;
 commonOpts.solver        = 'mosek';
 commonOpts.miniter       = 5; % minimum iterations before an aborted CD run still counts as successful
 
@@ -207,8 +215,35 @@ resultsTable = cell2table(tableRows,'VariableNames',tableVariableNames);
 disp(resultsTable)
 
 
+%% Store benchmark data
+
+fprintf('\n')
+fprintf('Store benchmark data in .mat file\n')
+fprintf('\n')
+
+save([name_of_benchmark '_' commonOpts.solver '.mat'],...         % name of .mat files
+     'casadiVersion',...                    % store the used casadi version
+     'date_of_benchmark',...                % date when the benchmark was generated
+     'matlabVersion',...                    % store the matlab version
+     'probNames',...                        % names for each run
+     'cdSolverStructs',...                  % struct containing stats and solution for CD
+     'seqSolverStructs_hessApprox2',...     % struct containing stats and solution for the sequential with alternative hessian estimation
+     'seqSolverStructs_regularization',...  % struct containing stats and solution for the sequential with default hessian estimation
+     'commonOpts',...                       % shared options
+     'enable_second_sequential', ...        % flag to enable second sequential run with alternative hessian approx
+     'enable_plot_convergence', ...         % flag to enable plot of convergence
+     'hess_est_method_1', ...               % default hessian estimation method (needed as string for plotting)
+     'hess_est_method_2', ...               % second hessian estimation method
+     'tableRows', ...                       % table with result
+     'tableVariableNames')                  % column names for table
+
+fprintf('\n')
+
 %% Performance Profile (Dolan & More, Math. Program. 91, 2002)
 
+
+fprintf('Evaluate benchmark ... \n')
+fprintf('\n')
 % sequential runs stored per Hessian estimation method (cf. hess_est_method)
 seqMethodStructs = {seqSolverStructs_regularization};
 seqMethodNames   = {hess_est_method_1};
@@ -222,9 +257,9 @@ end
 % cells, which fprintf rejects)
 solverNames = cell(1, numel(seqMethodNames) + 1);
 for s = 1:numel(seqMethodNames)
-    solverNames{s} = ['Sequential (' seqMethodNames{s} ')'];
+    solverNames{s} = ['Sequential (' seqMethodNames{s} ', ' commonOpts.solver ')'];
 end
-solverNames{end} = 'Coordinate-descent';
+solverNames{end} = ['Coordinate-descent',' (' commonOpts.solver ')'];
 
 % evaluate the stored test data: shifted geometric means and the
 % performance profile plots (legend labels passed as inputs)

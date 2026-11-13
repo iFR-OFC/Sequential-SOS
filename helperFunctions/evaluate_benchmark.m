@@ -25,9 +25,9 @@ end
 % solver names: one sequential solver per Hessian estimation method plus coordinate descent
 solverNames = cell(1, numel(seqMethodNames) + 1);
 for s = 1:numel(seqMethodNames)
-    solverNames{s} = ['Sequential (' seqMethodNames{s} ')'];
+    solverNames{s} = ['Sequential (' seqMethodNames{s} ', ' commonOpts.solver ')'];
 end
-solverNames{end} = 'Coordinate-descent';
+solverNames{end} = ['Coordinate-descent',' (' commonOpts.solver ')'];
 
 % evaluate 
 plotPerformanceProfiles(seqMethodStructs, ...

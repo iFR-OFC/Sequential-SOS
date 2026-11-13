@@ -67,8 +67,8 @@ for seq_kk = 1:seq_nRuns
     evalSequentialStruct_regularization = evalSequential(seqSolverStructs_regularization{seq_kk});
 
     % extract individual times
-    seq_main_sdp_time_arr(seq_kk)      = sum(evalSequentialStruct_regularization.main_sdp_time);
-    seq_feas_res_time_arr(seq_kk)      = sum(evalSequentialStruct_regularization.feas_res_time);
+    seq_main_sdp_time_arr(seq_kk)       = sum(evalSequentialStruct_regularization.main_sdp_time);
+    seq_feas_res_time_arr(seq_kk)       = sum(evalSequentialStruct_regularization.feas_res_time);
     seq_filter_accept_time_arr(seq_kk)  = sum(evalSequentialStruct_regularization.filter_accept_time);
     seq_hess_approx_time_arr(seq_kk)    = sum(evalSequentialStruct_regularization.hess_approx_time);
     seq_soc_time_arr(seq_kk)            = sum(evalSequentialStruct_regularization.soc_time);
@@ -115,7 +115,9 @@ for seq_kk = 1:seq_nRuns
         seq_rel_time_soc_backstep(seq_kk)           = seq_soc_time_arr(seq_kk) / seq_total_backstep_time_arr(seq_kk);
         seq_rel_time_suff_decrease_backstep(seq_kk)  = seq_suff_decrease_time_arr(seq_kk) / seq_total_backstep_time_arr(seq_kk);
         seq_rel_time_backstep_other(seq_kk)          = max(0, 1 - (seq_rel_time_filter_accept_backstep(seq_kk) + ...
-            seq_rel_time_soc_backstep(seq_kk) + seq_rel_time_suff_decrease_backstep(seq_kk)));
+                                                                   seq_rel_time_soc_backstep(seq_kk) + ...
+                                                                   seq_rel_time_suff_decrease_backstep(seq_kk)));
+
         seq_backstepFractions = [seq_rel_time_filter_accept_backstep(seq_kk), ...
                                  seq_rel_time_soc_backstep(seq_kk), ...
                                  seq_rel_time_suff_decrease_backstep(seq_kk), ...

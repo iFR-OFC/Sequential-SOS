@@ -58,6 +58,7 @@ hess_est_method_2 = 'levenberg';           % 'BFGS', 'levenberg', 'mirroring'
 commonOpts.maxiter       = 100;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.maxSolveTime  = 3600;
+commonOpts.almost_opt_count = 10;
 commonOpts.solver        = 'clarabel';
 commonOpts.miniter       = 5; % minimum iterations before an aborted CD run still counts as successful
 

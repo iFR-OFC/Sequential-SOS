@@ -17,6 +17,8 @@ l = 1e-6*(x'*x);
 % options
 opts                              = struct('sossol',commonOpts.solver);
 opts.max_iter                     = commonOpts.maxiter;
+opts.max_time                     = commonOpts.maxSolveTime;
+opts.almost_opt_count             = commonOpts.almost_opt_count;
 
 if  strcmpi(commonOpts.solver,'mosek')
 
