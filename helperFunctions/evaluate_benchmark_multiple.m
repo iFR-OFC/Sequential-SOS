@@ -26,14 +26,6 @@ for mm = 1:numBenchmarks
 
     load(matFileNames{mm})
 
-    fprintf('\n')
-    fprintf('-----------------------------------------------------------------------------------------------------\n')
-    fprintf('Benchmark %d of %d: %s (solver: %s)\n', mm, numBenchmarks, name_of_benchmark, commonOpts.solver)
-    fprintf('Date of benchmark: %s\n', date_of_benchmark)
-    fprintf('MATLAB version: %s\n', matlabVersion)
-    fprintf('CasADi version: %s\n', casadiVersion)
-    fprintf('-----------------------------------------------------------------------------------------------------\n')
-    fprintf('\n')
 
 % sequential runs stored per Hessian estimation method 
 seqMethodStructs = {seqSolverStructs_regularization};
@@ -46,9 +38,9 @@ end
 % solver names: one sequential solver per Hessian estimation method plus coordinate descent
 solverNames = cell(1, numel(seqMethodNames) + 1);
 for s = 1:numel(seqMethodNames)
-    solverNames{s} = ['Sequential (' seqMethodNames{s} ', ' commonOpts.solver ')'];
+    solverNames{s} = ['SQ (' seqMethodNames{s} ', ' commonOpts.solver ')'];
 end
-solverNames{end} = ['Coordinate-descent',' (' commonOpts.solver ')'];
+solverNames{end} = ['CD',' (' commonOpts.solver ')'];
 
 seqMethodStructsAll{mm}     = seqMethodStructs;
 cdSolverStructsAll{mm}      = cdSolverStructs;

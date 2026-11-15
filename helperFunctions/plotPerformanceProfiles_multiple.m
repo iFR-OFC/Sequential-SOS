@@ -11,6 +11,13 @@ n_sAll        = zeros(1, numBenchmarks);
 t_psAll       = cell(1, numBenchmarks);
 solved_psAll  = cell(1, numBenchmarks);
 
+% solverColors = [];
+% for mm = 1:numBenchmarks
+%     n_s = numel(solverNamesAll{mm});
+% 
+% solverColors = [solverColors ;lines(n_s)];
+% 
+% end
 for mm = 1:numBenchmarks
 
 % number of problems n_p: one stored run per cell entry
@@ -150,7 +157,7 @@ for mm = 1:numBenchmarks
     solved_ps(rowOffset+1:rowOffset+rows_mm, colOffset+1:colOffset+n_sAll(mm))              = solved_psAll{mm};
     maxSolveTime_ps(rowOffset+1:rowOffset+rows_mm, colOffset+1:colOffset+n_sAll(mm))         = maxSolveTimeAll{mm};
     for s = 1:n_sAll(mm)
-        legendNames{colOffset+s} = [benchmarkNamesAll{mm} ': ' solverNamesAll{mm}{s}];
+        legendNames{colOffset+s} =  solverNamesAll{mm}{s};
     end
     rowOffset = rowOffset + rows_mm;
     colOffset = colOffset + n_sAll(mm);
@@ -159,8 +166,6 @@ applicable_ps = ~isnan(t_ps);
 
 % number of problems n_p remaining in the test set
 n_p = size(t_ps, 1);
-
-% solver colors for reporting and plotting
 solverColors = lines(n_s);
 
 % shift k of the shifted geometric mean
@@ -241,8 +246,10 @@ figure('Name', 'Performance Profiles')
 tiledlayout(1,2) %  relative performance profile
 ax_r = nexttile;
 for s = 1:n_s
-    semilogx(ax_r, tau, f_s_r(:, s), 'LineWidth', 2, 'Color', solverColors(s, :)), hold(ax_r, 'on')
+    semilogx(ax_r, tau, f_s_r(:, s), 'LineWidth', 2, 'Color', solverColors(s, :) )
+    hold(ax_r, 'on')
 end
+% linestyleorder("mixedstyles")
 grid(ax_r, 'on'), grid(ax_r, 'minor')
 xlim(ax_r, [1, 100]), ylim(ax_r, [0, 1])
 xticks(ax_r, [1, 10, 100])

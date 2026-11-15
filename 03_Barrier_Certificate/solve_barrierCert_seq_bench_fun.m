@@ -55,7 +55,7 @@ sos.('g') = [
              s2;
              s3;
              s4;
-             b - 1e-4;
+             b - 1e-6;
              s1*(B-b)-nabla(B,x)*subs(f,u,kappa);
              s2*(B-b) + kappa - umin;
              s3*(B-b) + umax - kappa;

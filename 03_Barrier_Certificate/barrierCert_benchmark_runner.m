@@ -44,7 +44,7 @@ addPaths  = { ...
     fullfile(runnerDir,'MultiInput'), ...
     fullfile(runnerDir,'Aircraft_affine'), ...
     fullfile(runnerDir,'Pendubot'),...
-    fullfile(runnerDir,'Quadcopter'),...
+    fullfile(runnerDir,'PowerConverter'),...
     fullfile(runnerDir,'Satellite'), ...
     fullfile(runnerDir,'..','helperFunctions')};
 
@@ -337,6 +337,119 @@ for kk = 1:numel(degV)
                             evalSequentialStruct_MiMo_regularization,...
                             [],...
                             solStruct_CD_MiMo)
+        end
+    end
+end
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
+%% PowerConv
+
+% define the problem instances based on different polynomial degrees
+degV = {2, 2:4, 2:4};
+degK = {1, 1, 1:2};
+
+
+for kk = 1:numel(degV)
+
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_PowerConv = generatePowerConv_probStruct(degV{kk},degK{kk});
+
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_PowerConv.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
+
+    % generate an initial guess
+    x0 = generate_initGuess_PowerConv(probStruct_PowerConv);
+
+    % solve PowerConv example with two states using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_PowerConv_regularization = solve_barrierCert_seq_bench_fun(probStruct_PowerConv, ...
+                                                                        commonOpts, ...
+                                                                        x0, ...
+                                                                        hess_est_method);
+
+    seqSolverStructs_regularization{end+1} = solStruct_seq_PowerConv_regularization;
+
+    % extract size and timing statistic from sequential and add some meta
+    % data for plotting
+    evalSequentialStruct_PowerConv_regularization                 = evalSequential(solStruct_seq_PowerConv_regularization);
+    evalSequentialStruct_PowerConv_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_PowerConv_regularization.probNumber      = kk;
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    if enable_second_sequential
+
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_PowerConv_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_PowerConv, ...
+                                                                         commonOpts, ...
+                                                                         x0, ...
+                                                                         hess_est_method);
+
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_PowerConv_hessApprox2;
+
+        % just some gap in display output
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_PowerConv_hessApprox2                 = evalSequential(solStruct_seq_PowerConv_hessApprox2);
+        evalSequentialStruct_PowerConv_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_PowerConv_hessApprox2.probNumber      = kk;
+    end
+
+    % solve PowerConv example with two states using custom coordinate-descent
+    solStruct_CD_PowerConv = solve_barrierCert_CD_bench_fun(probStruct_PowerConv,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_PowerConv;
+    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_PowerConv.Name, kk, numel(degV));
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    % append the current run to the accumulating results table
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_PowerConv, ...
+                                    solStruct_CD_PowerConv, ...
+                                    solStruct_seq_PowerConv_regularization, ...
+                                    solStruct_seq_PowerConv_hessApprox2, ...
+                                    true);
+    else
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_PowerConv, ...
+                                    solStruct_CD_PowerConv, ...
+                                    solStruct_seq_PowerConv_regularization, ...
+                                    [], ...
+                                    true);
+    end
+
+    if enable_plot_convergence
+        if enable_second_sequential
+            % Evaluate
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_PowerConv_regularization,...
+                            evalSequentialStruct_PowerConv_hessApprox2,...
+                            solStruct_CD_PowerConv)
+        else
+            % Evaluate
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_PowerConv_regularization,...
+                            [],...
+                            solStruct_CD_PowerConv)
         end
     end
 end
