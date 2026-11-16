@@ -24,21 +24,22 @@ ylabel(['$ \frac{\left\| \nabla_{L}(\xi^k,\lambda^k) \right\|_\infty \, \left\| 
         '{\max\left(1,\left|f(\xi^k)\right|\right) + \left\|\langle \lambda^k, g(\xi^k)\rangle\right\|_\infty} $'], ...
        'Interpreter','latex')
 
-legendLabels = {['Sequential' ' (' evalSequentialStruct.hess_est_method ')']};
+legendLabels = {['SQ' ' (' evalSequentialStruct.hess_est_method ')']};
 if enable_second_sequential
-    legendLabels{end+1} = ['Sequential' ' (' evalSequentialStruct_hessApprox2.hess_est_method ')'];
+    legendLabels{end+1} = ['SQ' ' (' evalSequentialStruct_hessApprox2.hess_est_method ')'];
 end
 if ~isempty(solStruct_CD)
-    legendLabels{end+1} = 'Coordinate-descent';
+    legendLabels{end+1} = 'CD';
 end
-legend(legendLabels{:})
+
 if enable_second_sequential
     maxIter = max([evalSequentialStruct.iterations, evalSequentialStruct_hessApprox2.iterations, solStruct_CD.stats.iterations]);
 else
     maxIter = max(evalSequentialStruct.iterations,solStruct_CD.stats.iterations);
 end
 plot([0 maxIter],[evalSequentialStruct.options.tolerance_opt evalSequentialStruct.options.tolerance_opt],'k--','LineWidth',1.2)
-
+legendLabels{end+1} =  '$\epsilon_\mathrm{opt}$';
+legend(legendLabels{:})
 % constraint violation of sequential SOS
 % ------------------------------------------------------------------------
 % Note: If we are in the SOS cone, constraint violation is negative if
@@ -59,11 +60,11 @@ hold on
 plot([0 maxIter],[eps eps],'k-.','LineWidth',1.2)
 
 
-semilogy(evalSequentialStruct.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation')
+semilogy(0:evalSequentialStruct.iterations,evalSequentialStruct.maxConVio,'LineWidth',1.2), grid on, title('Maximum constraint violation')
 
 
 if enable_second_sequential
-    semilogy(evalSequentialStruct_hessApprox2.maxConVio,'LineWidth',1.2), hold on
+    semilogy(0:evalSequentialStruct_hessApprox2.iterations,evalSequentialStruct_hessApprox2.maxConVio,'LineWidth',1.2), hold on
 end
 
 
