@@ -26,6 +26,7 @@ runnerDir = fileparts(mfilename('fullpath'));
 
 addPaths  = { ...
     fullfile(runnerDir,'Satellite'), ...
+    fullfile(runnerDir,'VDP_coupled/'), ...
     fullfile(runnerDir,'..','helperFunctions')};
 
 for ii = 1:numel(addPaths)
@@ -34,7 +35,7 @@ end
 
 % enable plotting of convergence for each run
 enable_plot_convergence  = true;
-enable_second_sequential = false;
+enable_second_sequential = true;
 
 % Hessian estimation methods of the sequential solver to compare
 hess_est_method_1 = 'regularization'; % our default (see also sequentialCommon.m)
@@ -43,6 +44,8 @@ hess_est_method_2 = 'BFGS';      % 'BFGS', 'levenberg', 'mirroring'
 % common options shared by the methods
 commonOpts.maxiter       = 500;
 commonOpts.tolerance_opt = 1e-4;
+commonOpts.eps_cost      = 1e-6;
+commonOpts.small_prog_count = 10;
 commonOpts.maxSolveTime  = 3600;
 commonOpts.almost_opt_count = 10;
 commonOpts.solver        = 'mosek';
@@ -91,6 +94,120 @@ seqSolverStructs_hessApprox2    = {};
 cdSolverStructs                 = {};
 probNames                       = {}; % problem name per run (for the evaluation output)
 
+%% VDP_coupled
+
+% define the problem instances based on different polynomial degrees
+degV = {2,   2, 2, 2:4};
+degH = {2, 2:4, 2, 2:4};
+degK = {1, 1, 1:2,  1:2};
+
+
+for kk = 1:numel(degV)
+
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_VDP_coupled = generateVDP_coupled_probStruct(degV{kk},degH{kk},degK{kk});
+
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('CBF-CLF Benchmark for %s Instance %d of %d. \n', probStruct_VDP_coupled.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
+
+    % generate an initial guess
+    x0 = generate_initGuess_VDP_coupled(probStruct_VDP_coupled);
+
+    % solve VDP_coupled example using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_VDP_coupled_regularization = solve_CbfClf_seq_bench_fun(probStruct_VDP_coupled, ...
+                                                                        commonOpts, ...
+                                                                        x0, ...
+                                                                        hess_est_method);
+
+    seqSolverStructs_regularization{end+1} = solStruct_seq_VDP_coupled_regularization;
+
+    % extract size and timing statistic from sequential and add some meta
+    % data for plotting
+    evalSequentialStruct_VDP_coupled_regularization                 = evalSequential(solStruct_seq_VDP_coupled_regularization);
+    evalSequentialStruct_VDP_coupled_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_VDP_coupled_regularization.probNumber      = kk;
+    evalSequentialStruct_VDP_coupled_hessApprox2 = [];
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    if enable_second_sequential
+
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_VDP_coupled_hessApprox2 = solve_CbfClf_seq_bench_fun(probStruct_VDP_coupled, ...
+                                                                         commonOpts, ...
+                                                                         x0, ...
+                                                                         hess_est_method);
+
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_VDP_coupled_hessApprox2;
+
+        % just some gap in display output
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_VDP_coupled_hessApprox2                 = evalSequential(solStruct_seq_VDP_coupled_hessApprox2);
+        evalSequentialStruct_VDP_coupled_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_VDP_coupled_hessApprox2.probNumber      = kk;
+    end
+
+    % solve VDP_coupled example using custom coordinate-descent
+    solStruct_CD_VDP_coupled = solve_CbfClf_CD_bench_fun(probStruct_VDP_coupled,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_VDP_coupled;
+    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_VDP_coupled.Name, kk, numel(degV));
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    % append the current run to the accumulating results table
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_VDP_coupled, ...
+                                    solStruct_CD_VDP_coupled, ...
+                                    solStruct_seq_VDP_coupled_regularization, ...
+                                    solStruct_seq_VDP_coupled_hessApprox2, ...
+                                    true);
+    else
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_VDP_coupled, ...
+                                    solStruct_CD_VDP_coupled, ...
+                                    solStruct_seq_VDP_coupled_regularization, ...
+                                    [], ...
+                                    true);
+    end
+
+    if enable_plot_convergence
+        if enable_second_sequential
+            % Evaluate
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_VDP_coupled_regularization,...
+                            evalSequentialStruct_VDP_coupled_hessApprox2,...
+                            solStruct_CD_VDP_coupled)
+        else
+            % Evaluate
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_VDP_coupled_regularization,...
+                            [],...
+                            solStruct_CD_VDP_coupled)
+        end
+    end
+end
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 %% Satellite
 

@@ -217,10 +217,13 @@ solvetime_all2(1) = 0;
 cost_CD(1) = full(eval_cost(x0));
 
 % no multipliers available at the initial guess -> use zeros (cf. sequential)
-lam_gs_0 = zeros(numel(lam_gs),1);
+lam_gs_0 = casos.PD(sparsity(lam_gs),zeros(lam_gs.nnz,1));
 
 % no previous iterate at the zeroth iterate (x_prev = x0)
 inf_delta_x_0 = norm(full(poly2basis(x_prev)),inf);
+
+lam_prev        = lam_gs_0;
+inf_delta_lam_0 = norm(full(poly2basis(lam_gs_0)),inf);
 
 nabla_L(1)        = full(eval_gradLag(x0,lam_gs_0));
 inf_g_0           = full(eval_gradLag_inf_norm(x0,lam_gs_0));
@@ -228,11 +231,11 @@ nabla_L_scaled(1) = nabla_L(1)*inf_delta_x_0/(max(1,abs(cost_CD(1)) + inf_g_0));
 
 % display output header
 fprintf('------------------------------------------------------------------------------------------\n');
-fprintf('%-8s%-15s%-15s\n','iter','obj','||dLdx||');
+fprintf('%-8s%-15s%-15s%-15s%-15s\n','iter','obj',['||' char(916) 'x' '||_inf'],['||' char(916) char(955) '||_inf'],'||dLdx||');
 fprintf('------------------------------------------------------------------------------------------\n');
 
 % display output current iterate (zeroth iteration = initial guess)
-fprintf('%-8d%-15g%-15g\n',0,cost_CD(1),nabla_L(1));
+fprintf('%-8d%-15g%-15g%-15g%-15g\n',0,cost_CD(1),inf_delta_x_0,inf_delta_lam_0,nabla_L(1));
 
 buildBisecTime = 0;
 solveBisecTime  = 0;
@@ -241,6 +244,7 @@ solved = 1;
 
 % counter until solution is marked almost optimal
 counter_almost_opt_iter    = 0;
+counter_small_progress     = 0;
 
 % flag to indicate that the maximum solve time was reached
 time_limit_reached = false;
@@ -422,6 +426,8 @@ for iter = 2:maxIter+1
         delta_x     = sol_x_it - x_prev;
         inf_delta_x = norm(full(poly2basis(delta_x)),inf);
 
+        inf_delta_lam = norm(full(poly2basis(lam_gs_it- lam_prev) ),inf);
+
         % evaluate first order KKT at current iterate
         nabla_L(iter) = full(eval_gradLag( sol_x_it,lam_gs_it));
 
@@ -435,19 +441,20 @@ for iter = 2:maxIter+1
 
         % display output header every 10th iteration
         if ~mod(iter-1,10) && iter-1 > 0
-            fprintf('%-8s%-15s%-15s\n','iter','obj','||dLdx||');
+            fprintf('%-8s%-15s%-15s%-15s%-15s\n','iter','obj',['||' char(916) 'x' '||_inf'],['||' char(916) char(955) '||_inf'],'||dLdx||');
             fprintf('------------------------------------------------------------------------------------------\n');
         end
 
         % display output current iterate
-        fprintf('%-8d%-15g%-15g\n',iter-1,cost_CD(iter),nabla_L(iter));
+        fprintf('%-8d%-15g%-15g%-15g%-15g\n',iter-1,cost_CD(iter),inf_delta_x,inf_delta_lam,nabla_L(iter));
 
         % scaled termination criterion
         if nabla_L(iter) <= commonOpts.tolerance_opt*(max(1,abs(full(sol2.f)) + inf_g ))/inf_delta_x
             break
         else
             % set current iterate to previous iterate
-            x_prev =  sol_x_it;
+            x_prev   = sol_x_it;
+            lam_prev = lam_gs_it;
         end
 
         % check if current iterate is solved to an acceptable level
@@ -464,6 +471,19 @@ for iter = 2:maxIter+1
         else
             % if current iterate is not solved to an acceptable level, reset counter
             counter_almost_opt_iter = 0;
+        end
+
+        if abs(cost_CD(iter) - cost_CD(iter-1)) <= commonOpts.eps_cost
+            counter_small_progress =  counter_small_progress +1;
+
+            if counter_small_progress >= commonOpts.small_prog_count
+                    solved = 5;
+                    break
+            end
+
+        else
+            % reset
+            counter_small_progress = 0;
         end
 
     end % check if we need bisection
@@ -523,6 +543,8 @@ elseif solved == 2
     fprintf('Solution status: Abort midway. Solved to feasible point, but did not reach KKT point\n')
 elseif solved == 4
     fprintf('Solution status: Almost optimal.\n')
+elseif solved == 5
+    fprintf('Solution status: Small objective progress.\n')
 elseif time_limit_reached
     fprintf('Solution status: Maximum solve time reached\n')
 elseif strcmp(UNIFIED_RETURN_STATUS,'RET_LIMITED') && iter > maxIter

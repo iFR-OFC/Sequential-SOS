@@ -57,6 +57,8 @@ hess_est_method_2 = 'levenberg';           % 'BFGS', 'levenberg', 'mirroring'
 % common options shared by the methods
 commonOpts.maxiter       = 100;
 commonOpts.tolerance_opt = 1e-4;
+commonOpts.eps_cost      = 1e-6;
+commonOpts.small_prog_count = 10;
 commonOpts.maxSolveTime  = 3600;
 commonOpts.almost_opt_count = 10;
 commonOpts.solver        = 'clarabel';
