@@ -112,6 +112,7 @@ h = casos.PS(1*t*(T-t*1));
 % options
 opts.verbose  = 1;
 opts.max_iter = 100;
+opts.max_time = 3600;
 opts.sossol_options.newton_solver = [];
 
 %% setup solver

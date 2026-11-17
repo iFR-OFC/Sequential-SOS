@@ -33,6 +33,7 @@ umax = probStruct.umax;
 % options
 opts                              = struct('sossol',commonOpts.solver);
 opts.max_iter                     = commonOpts.maxiter;
+opts.max_time                     = commonOpts.maxSolveTime;
 
 if  strcmpi(commonOpts.solver,'mosek')
 

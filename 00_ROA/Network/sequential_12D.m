@@ -47,6 +47,7 @@ l = 1e-6*(x'*x);
 % options
 opts = struct('sossol','mosek');
 opts.verbose  = 1;
+opts.max_time = 3600;
 opts.almost_opt_count = 10;
 opts.sossol_options.newton_solver = [];
 

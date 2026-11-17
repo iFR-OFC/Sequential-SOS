@@ -78,6 +78,7 @@ s10 = casos.PS.sym('s10',monomials(x,0:4));
 % options
 opts.sossol = 'mosek';
 opts.max_iter = 100;
+opts.max_time = 3600;
 opts.verbose  = 1;
 opts.sossol_options.newton_solver = [];
 

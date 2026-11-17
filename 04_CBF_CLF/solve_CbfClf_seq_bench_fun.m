@@ -26,6 +26,7 @@ umax = probStruct.umax;
 % options
 opts                              = struct('sossol',commonOpts.solver);
 opts.max_iter                     = commonOpts.maxiter;
+opts.max_time                     = commonOpts.maxSolveTime;
 opts.con_vio_check                = 'signed-distance';
 
 if  strcmpi(commonOpts.solver,'mosek')

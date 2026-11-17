@@ -145,6 +145,7 @@ l = 1e-6*(x'*x);
 opts = struct('sossol','mosek');
 opts.verbose  = 1;
 opts.max_iter = 100;
+opts.max_time = 3600;
 opts.almost_opt_count = 10;
 % opts.tolerance_con = 1e-4;
 % opts.con_vio_check = 'sampling';
