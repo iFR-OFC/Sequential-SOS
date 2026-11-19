@@ -200,7 +200,7 @@ fprintf('\n')
 % failed solves have no valid time: their ratio is Inf, i.e. they never
 % count within the plotted range (this is Dolan & More's r_M convention)
 t_valid                                  = t_ps;
-t_valid(~solved_ps & applicable_ps)      = maxSolveTime_ps(~solved_ps & applicable_ps);
+t_valid(~solved_ps & applicable_ps)      = Inf;
 
 % relative performance ratio u_{p,s} = t_{p,s} / min{ t_{p,s} : s in S }
 % (u_{p,s} is exactly the performance ratio r_{p,s} of Dolan & More;

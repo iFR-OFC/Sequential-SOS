@@ -32,7 +32,6 @@ addPaths  = { ...
     fullfile(runnerDir,'MultiInput'), ...
     fullfile(runnerDir,'Aircraft_affine'), ...
     fullfile(runnerDir,'Pendubot'),...
-    fullfile(runnerDir,'Quadcopter'),...
     fullfile(runnerDir,'Satellite'), ...
     fullfile(runnerDir,'..','helperFunctions')};
 
@@ -55,9 +54,9 @@ commonOpts.maxiter       = 500;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.eps_cost      = 1e-6;
 commonOpts.small_prog_count = 10;
-commonOpts.maxSolveTime  = 3600;
+commonOpts.maxSolveTime  =  3600;
 commonOpts.almost_opt_count = 10;
-commonOpts.solver        = 'mosek';
+commonOpts.solver        = 'clarabel';
 commonOpts.miniter       = 5; % minimum iterations before an aborted CD run still counts as successful
 
 % Solver settings
@@ -106,6 +105,8 @@ seqSolverStructs_hessApprox2    = {};
 cdSolverStructs                 = {};
 probNames                       = {}; % problem name per run (for the evaluation output)
 
+
+total_benchmark_time_start = tic;
 
 %% VDP
 
@@ -790,6 +791,14 @@ end
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 
+total_benchmark_time = toc(total_benchmark_time_start);
+
+total_benchmark_time_h = total_benchmark_time/3600;
+
+fprintf('Total benchmark time: %f second\n', total_benchmark_time);
+fprintf('Total benchmark time: %f minutes\n', total_benchmark_time/60);
+fprintf('Total benchmark time: %f hours\n', total_benchmark_time_h);
+
 %% Store benchmark data
 
 fprintf('\n')
@@ -797,6 +806,8 @@ fprintf('Store benchmark data in .mat file\n')
 fprintf('\n')
 
 save([name_of_benchmark '_' commonOpts.solver '.mat'],...         % name of .mat files
+         "name_of_benchmark",... 
+         "total_benchmark_time_h",...
      'casadiVersion',...                    % store the used casadi version
      'date_of_benchmark',...                % date when the benchmark was generated
      'matlabVersion',...                    % store the matlab version

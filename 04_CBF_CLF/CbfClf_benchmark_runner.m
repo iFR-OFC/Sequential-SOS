@@ -94,6 +94,8 @@ seqSolverStructs_hessApprox2    = {};
 cdSolverStructs                 = {};
 probNames                       = {}; % problem name per run (for the evaluation output)
 
+total_benchmark_time_start = tic;
+
 %% VDP_coupled
 
 % define the problem instances based on different polynomial degrees
@@ -332,6 +334,12 @@ resultsTable = cell2table(tableRows,'VariableNames',tableVariableNames);
 disp(resultsTable)
 
 
+total_benchmark_time = toc(total_benchmark_time_start);
+
+total_benchmark_time_h = total_benchmark_time/3600;
+
+fprintf('Total benchmark time: %.2f hours\n', total_benchmark_time_h);
+
 %% Store benchmark data
 
 fprintf('\n')
@@ -339,6 +347,8 @@ fprintf('Store benchmark data in .mat file\n')
 fprintf('\n')
 
 save([name_of_benchmark '_' commonOpts.solver '.mat'],...         % name of .mat files
+         "name_of_benchmark",... 
+         "total_benchmark_time_h",...
      'casadiVersion',...                    % store the used casadi version
      'date_of_benchmark',...                % date when the benchmark was generated
      'matlabVersion',...                    % store the matlab version

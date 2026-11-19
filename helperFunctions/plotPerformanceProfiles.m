@@ -6,8 +6,6 @@ fprintf('-----------------------------------------------------------------------
 fprintf('\n')
 
 % number of problems n_p: one stored run per cell entry
-% (if no coordinate-descent runs are given, e.g. for CBF-CLF, take the
-% number of sequential runs instead)
 if isempty(cdSolverStructs)
     n_p = numel(seqMethodStructs{1});
 else
@@ -30,11 +28,13 @@ n_s = numel(solverNames);
 % extract each run from the cell arrays of stored solver structs
 t_ps = zeros(n_p, n_s);
 for p = 1:n_p
+
     % sequential runs of problem p, one per Hessian estimation method
     for s = 1:numel(seqMethodStructs)
         solStruct_seq = seqMethodStructs{s}{p};
         t_ps(p, s) = solStruct_seq.stats.total_solve_time;
     end
+
     % coordinate-descent run of problem p
     if hasCD
         solStruct_cd  = cdSolverStructs{p};
@@ -64,16 +64,20 @@ end
 keep_p = any(solved_ps, 2);
 
 % additionally drop problems for which the solvers converged to
-% different local solutions (cf. Eq. (38) in Waechter & Biegler,
-% Math. Program. 106, 2004, p. 49): the final objective values of the
-% unsuccessful runs are omitted and the problem is discarded if
-% (f_*^max - f_*^min) / (1 + max(|f_*^min|, |f_*^max|)) > 1e-1
+% different local solutions 
+% 
+% see in Waechter & Biegler, Math. Program. 106, 2004, p. 49)
+% if (f_*^max - f_*^min) / (1 + max(|f_*^min|, |f_*^max|)) > 1e-1, then
+% discard
+
 keep_cost = true(n_p, 1);
 for p = 1:n_p
+
     % problems already dropped above cannot enter the comparison
     if ~keep_p(p)
         continue
     end
+
     % final objective values f(x_*^s) of the successful runs of problem p
     f_star = nan(n_s, 1);
 
@@ -100,18 +104,14 @@ for p = 1:n_p
     if (f_star_max - f_star_min) / (1 + max(abs(f_star_min), abs(f_star_max))) > 1e-1
         keep_cost(p) = false;
     end
+
 end
 
-% if any(keep_p & ~keep_cost)
-%     fprintf('Discarded %d problem(s) with diverging final objective values\n', ...
-%         sum(keep_p & ~keep_cost))
-% end
-
+% keep only feasible problems and only problems with similar local solution
 keep_p = keep_p & keep_cost;
 
-% report which benchmarks are considered in the performance profile:
-% sorted out are problems that are infeasible for all solvers as well as
-% problems whose successful runs converged to different local solutions
+% report which benchmarks are considered in the performance profile and if
+% not why not
 fprintf('Benchmark selection for the performance profile (%d of %d considered) \n', nnz(keep_p), n_p)
 
 for p = 1:n_p
@@ -124,6 +124,7 @@ for p = 1:n_p
     end
 end
 fprintf('\n')
+
 % remove those runs
 t_ps(~keep_p, :)      = [];
 solved_ps(~keep_p, :) = [];
@@ -163,10 +164,10 @@ fprintf('-----------------------------------------------------------------------
 fprintf('\n')
 % Relative performance profile 
 
-% failed solves have no valid time: their ratio is Inf, i.e. they never
-% count within the plotted range (this is Dolan & More's r_M convention)
+
+% assume the fail runs have time set to infinity (just for plotting the performance profile)
 t_valid             = t_ps;
-t_valid(~solved_ps) = maxSolveTime;
+t_valid(~solved_ps) = Inf;
 
 % relative performance ratio u_{p,s} = t_{p,s} / min{ t_{p,s} : s in S }
 % (u_{p,s} is exactly the performance ratio r_{p,s} of Dolan & More;
@@ -183,7 +184,6 @@ min_time = 10^floor(log10(min(t_ps(solved_ps))));
 max_time = 10^ceil(log10(max(t_ps(solved_ps))));
 
 % exact step profile per solver at the sorted successful solve times;
-% failed solves raise no step, so the curve saturates below one
 for s = 1:n_s
 
     % sorted solve times of the successful runs of solver s
