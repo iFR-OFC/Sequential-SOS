@@ -51,8 +51,8 @@ enable_seq_badInit = true;
 genTikz = false;
 
 % Hessian estimation methods of the sequential solver to compare
-hess_est_method_1 = 'regularization';      % our default (see also sequentialCommon.m)
-hess_est_method_2 = 'levenberg';           % 'BFGS', 'levenberg', 'mirroring'
+hess_est_method_1 = 'regularization_frobenius';      % our default (see also sequentialCommon.m)
+hess_est_method_2 = 'regularization_levenberg';           % 'damped_bfgs', 'regularization_levenberg', 'regularization_mirror', 'regularization_frobenius'
 
 % common options shared by the methods
 commonOpts.maxiter       = 100;
