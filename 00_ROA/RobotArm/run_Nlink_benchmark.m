@@ -45,10 +45,8 @@ enable_plot_convergence = true;
 enable_second_sequential = false;
 
 % run sequential additionally with a clearly infeasible initial guess
-enable_seq_badInit = true;
+enable_seq_badInit = false;
 
-% set to true to generate tikz figure using MATLAB2TIKZ
-genTikz = false;
 
 % Hessian estimation methods of the sequential solver to compare
 hess_est_method_1 = 'regularization_frobenius';      % our default (see also sequentialCommon.m)
@@ -56,12 +54,12 @@ hess_est_method_2 = 'regularization_levenberg';           % 'damped_bfgs', 'regu
 
 % common options shared by the methods
 commonOpts.maxiter       = 100;
-commonOpts.tolerance_opt = 1e-4;
+commonOpts.tolerance_opt = 1e-3;
 commonOpts.eps_cost      = 1e-6;
 commonOpts.small_prog_count = 10;
-commonOpts.maxSolveTime  = 3600;
+commonOpts.maxSolveTime  = 50000; % here very large, because problem are large
 commonOpts.almost_opt_count = 10;
-commonOpts.solver        = 'clarabel';
+commonOpts.solver        = 'mosek';
 commonOpts.miniter       = 5; % minimum iterations before an aborted CD run still counts as successful
 
 % MOSEK settings
@@ -88,7 +86,7 @@ deg    = 2;
 
 % number of links: the robot arm has 2*N states
 Nmin   = 2;
-Nmax   = 6;  % n = 2*N
+Nmax   = 8;  % n = 2*N
 
 % variable names of the results table (one row per run)
 tableVariableNames = {'Prob. No.','Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
@@ -122,6 +120,8 @@ probNames         = {}; % problem name per run (for the evaluation output)
 % preallocate (only used if the corresponding run is disabled)
 evalSequentialStruct_Nlink_hessApprox2 = [];
 
+
+total_benchmark_time_start = tic;
 for kk = 1:(Nmax-Nmin+1)
 
     % current number of links
@@ -235,110 +235,12 @@ for kk = 1:(Nmax-Nmin+1)
 end
 
 
-% store the results of all runs for later evaluation
-% save('Nlink_benchmark_results.mat', ...
-%     'seqSolverStructs_regularization','seqSolverStructs_hessApprox2', ...
-%     'seqSolverStructs_badInit','cdSolverStructs','tableRows','tableVariableNames')
+total_benchmark_time = toc(total_benchmark_time_start);
+total_benchmark_time_h = total_benchmark_time/3600;
 
-
-%% Evaluation 
-
-runs = Nmin:Nmax;
-
-% extract solve times and iterations of the sequential runs
-solverTimes_total_Seq = cellfun(@(s) s.stats.total_solve_time, seqSolverStructs_regularization);
-iteration_array_Seq   = cellfun(@(s) s.stats.iterations,      seqSolverStructs_regularization);
-
-% extract solve times and iterations of the coordinate-descent runs
-solverTimes_total_CD  = cellfun(@(s) s.stats.totalSolveTime, cdSolverStructs);
-iteration_array_CD    = cellfun(@(s) s.stats.iterations,     cdSolverStructs);
-
-% post-processing of coordinate-descent, because some runs are infeasible,
-% and shall not appear in the computational statistics; infeasible runs
-% have a non-success return status
-idx_infes_cd = cellfun(@(s) strcmp(s.stats.UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS'), cdSolverStructs);
-
-% extract solve times and iterations of the sequential runs with bad initial guess
-if enable_seq_badInit
-    solverTimes_total_Seq_badInit = cellfun(@(s) s.stats.total_solve_time, seqSolverStructs_badInit);
-    iteration_array_Seq_badInit   = cellfun(@(s) s.stats.iterations,      seqSolverStructs_badInit);
-end
-
-% plot solve times
-figure('Name', 'Realtive improvement regarding solve times and iterations')
-subplot(211)
-hold on
-rel_solveTime = (solverTimes_total_CD(idx_infes_cd)'-solverTimes_total_Seq(idx_infes_cd)')./solverTimes_total_CD(idx_infes_cd)'*100;
-mean_solveTimeRel = mean(rel_solveTime);
-yline(mean_solveTimeRel)
-hold on
-bar(2*runs(idx_infes_cd),rel_solveTime);
-% xlabel('Number of states')
-legend('Mean value','rel. Improvement','Location','best')
-ylabel('Relative improvment in solve time in percent')
-xticks((2:Nmax)*2)
-
-% plot iterations (no subiterations of feasibiltity restoration)
-subplot(212)
-hold on
-rel_iteration = (iteration_array_CD(idx_infes_cd)'-iteration_array_Seq(idx_infes_cd)')./iteration_array_CD(idx_infes_cd)'*100;
-mean_rel_iteration = mean(rel_iteration);
-yline(mean_rel_iteration)
-hold on
-bar(2*runs(idx_infes_cd),rel_iteration);
-xlabel('Number of states')
-ylabel('Relative improvment in iterations in percent')
-legend('Mean value','rel. Improvement','Location','best')
-xticks((2:Nmax)*2)
-
-
-if genTikz
-cleanfigure();
-matlab2tikz('NlinkRobot.tex','width','\figW','height','\figH')
-end
-
-
-% plot solve times
-figure('Name', 'Solve times and iterations')
-subplot(211)
-semilogy(runs*2,solverTimes_total_Seq,'-o')
-hold on
-semilogy(runs(idx_infes_cd)*2,solverTimes_total_CD(idx_infes_cd),'-^')
-xlabel('Number of states')
-ylabel('Solver time [s]')
-legend('sequential','coordinate-descent','Location','northwest')
-xticks((2:Nmax)*2)
-
-% plot iterations (no subiterations of feasibiltity restoration)
-subplot(212)
- plot(runs*2,iteration_array_Seq,'-o')
-hold on
-plot(runs(idx_infes_cd)*2,iteration_array_CD(idx_infes_cd),'-^')
-xlabel('Number of states')
-ylabel('Iterations [-]')
-legend('sequential','coordinate-descent','Location','northwest')
-xticks((2:Nmax)*2)
-
-
-% time per iteration
-figure('Name', 'Time per iteration')
-plot(runs*2,solverTimes_total_Seq./iteration_array_Seq,'-o')
-hold on
-%plot(runs*2,solverTimes_total_Seq_badInit./iteration_array_Seq_badInit,'-o')
-plot(runs(idx_infes_cd)*2,solverTimes_total_CD(idx_infes_cd)./iteration_array_CD(idx_infes_cd),'-^')
-
-xlabel('Number of states')
-ylabel('Time/iteration [s]')
-legend('sequential','coordinate-descent','Location','northwest')
-xticks((2:Nmax)*2)
-
-% get number of linear constraints and decision variables (sequential)
-n_con = nan(numel(runs),1);
-n_dec = nan(numel(runs),1);
-for j = 1:numel(runs)
-   n_con(j) = seqSolverStructs_regularization{j}.info.sossol_convex.sdpsol.conic.size_a(1);
-   n_dec(j) = seqSolverStructs_regularization{j}.info.sossol_convex.sdpsol.conic.size_a(2);
-end
+fprintf('Total benchmark time: %f second\n', total_benchmark_time);
+fprintf('Total benchmark time: %f minutes\n', total_benchmark_time/60);
+fprintf('Total benchmark time: %f hours\n', total_benchmark_time_h);
 
 
 %% Performance Profile (Dolan & More, Math. Program. 91, 2002)
@@ -374,3 +276,100 @@ disp(resultsTable)
 for ii = 1:numel(addPaths)
     rmpath(addPaths{ii})
 end
+
+
+% %% Evaluation 
+% 
+% runs = Nmin:Nmax;
+% 
+% % extract solve times and iterations of the sequential runs
+% solverTimes_total_Seq = cellfun(@(s) s.stats.total_solve_time, seqSolverStructs_regularization);
+% iteration_array_Seq   = cellfun(@(s) s.stats.iterations,      seqSolverStructs_regularization);
+% 
+% % extract solve times and iterations of the coordinate-descent runs
+% solverTimes_total_CD  = cellfun(@(s) s.stats.totalSolveTime, cdSolverStructs);
+% iteration_array_CD    = cellfun(@(s) s.stats.iterations,     cdSolverStructs);
+% 
+% % post-processing of coordinate-descent, because some runs are infeasible,
+% % and shall not appear in the computational statistics; infeasible runs
+% % have a non-success return status
+% idx_infes_cd = cellfun(@(s) strcmp(s.stats.UNIFIED_RETURN_STATUS,'SOLVER_RET_SUCCESS'), cdSolverStructs);
+% 
+% % extract solve times and iterations of the sequential runs with bad initial guess
+% if enable_seq_badInit
+%     solverTimes_total_Seq_badInit = cellfun(@(s) s.stats.total_solve_time, seqSolverStructs_badInit);
+%     iteration_array_Seq_badInit   = cellfun(@(s) s.stats.iterations,      seqSolverStructs_badInit);
+% end
+% 
+% % plot solve times
+% figure('Name', 'Realtive improvement regarding solve times and iterations')
+% subplot(211)
+% hold on
+% rel_solveTime = (solverTimes_total_CD(idx_infes_cd)'-solverTimes_total_Seq(idx_infes_cd)')./solverTimes_total_CD(idx_infes_cd)'*100;
+% mean_solveTimeRel = mean(rel_solveTime);
+% yline(mean_solveTimeRel)
+% hold on
+% bar(2*runs(idx_infes_cd),rel_solveTime);
+% % xlabel('Number of states')
+% legend('Mean value','rel. Improvement','Location','best')
+% ylabel('Relative improvment in solve time in percent')
+% xticks((2:Nmax)*2)
+% 
+% % plot iterations (no subiterations of feasibiltity restoration)
+% subplot(212)
+% hold on
+% rel_iteration = (iteration_array_CD(idx_infes_cd)'-iteration_array_Seq(idx_infes_cd)')./iteration_array_CD(idx_infes_cd)'*100;
+% mean_rel_iteration = mean(rel_iteration);
+% yline(mean_rel_iteration)
+% hold on
+% bar(2*runs(idx_infes_cd),rel_iteration);
+% xlabel('Number of states')
+% ylabel('Relative improvment in iterations in percent')
+% legend('Mean value','rel. Improvement','Location','best')
+% xticks((2:Nmax)*2)
+% 
+% 
+% % plot solve times
+% figure('Name', 'Solve times and iterations')
+% subplot(211)
+% semilogy(runs*2,solverTimes_total_Seq,'-o')
+% hold on
+% semilogy(runs(idx_infes_cd)*2,solverTimes_total_CD(idx_infes_cd),'-^')
+% xlabel('Number of states')
+% ylabel('Solver time [s]')
+% legend('sequential','coordinate-descent','Location','northwest')
+% xticks((2:Nmax)*2)
+% 
+% % plot iterations (no subiterations of feasibiltity restoration)
+% subplot(212)
+%  plot(runs*2,iteration_array_Seq,'-o')
+% hold on
+% plot(runs(idx_infes_cd)*2,iteration_array_CD(idx_infes_cd),'-^')
+% xlabel('Number of states')
+% ylabel('Iterations [-]')
+% legend('sequential','coordinate-descent','Location','northwest')
+% xticks((2:Nmax)*2)
+% 
+% 
+% % time per iteration
+% figure('Name', 'Time per iteration')
+% plot(runs*2,solverTimes_total_Seq./iteration_array_Seq,'-o')
+% hold on
+% %plot(runs*2,solverTimes_total_Seq_badInit./iteration_array_Seq_badInit,'-o')
+% plot(runs(idx_infes_cd)*2,solverTimes_total_CD(idx_infes_cd)./iteration_array_CD(idx_infes_cd),'-^')
+% 
+% xlabel('Number of states')
+% ylabel('Time/iteration [s]')
+% legend('sequential','coordinate-descent','Location','northwest')
+% xticks((2:Nmax)*2)
+% 
+% % get number of linear constraints and decision variables (sequential)
+% n_con = nan(numel(runs),1);
+% n_dec = nan(numel(runs),1);
+% for j = 1:numel(runs)
+%    n_con(j) = seqSolverStructs_regularization{j}.info.sossol_convex.sdpsol.conic.size_a(1);
+%    n_dec(j) = seqSolverStructs_regularization{j}.info.sossol_convex.sdpsol.conic.size_a(2);
+% end
+
+
+

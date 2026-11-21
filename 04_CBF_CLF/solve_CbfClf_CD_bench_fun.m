@@ -216,7 +216,7 @@ inf_delta_lam_0 = norm(full(poly2basis(lam_gs_0)),inf);
 
 nabla_L(1)        = full(eval_gradLag(x0,lam_gs_0));
 inf_g_0           = full(eval_gradLag_inf_norm(x0,lam_gs_0));
-nabla_L_scaled(1) = nabla_L(1)*inf_delta_x_0/(max(1,abs(cost_CD(1)) + inf_g_0));
+nabla_L_scaled(1) = (nabla_L(1)*inf_delta_x_0 - inf_g_0)/max(1,abs(cost_CD(1)));
 
 % display output header
 fprintf('------------------------------------------------------------------------------------------\n');
@@ -341,7 +341,7 @@ for iter = 2:maxIter+1
         inf_g   = full(eval_gradLag_inf_norm(sol_x_it,lam_gs_it));
 
         % just for plotting
-        nabla_L_scaled(iter) = nabla_L(iter)*inf_delta_x/(max(1,abs(full(sol2.f)) + inf_g ));
+        nabla_L_scaled(iter) = (nabla_L(iter)*inf_delta_x - inf_g )/max(1,abs(full(sol2.f)));
 
         meas_time_kkt(iter) = toc(eval_kkt_con_start);
 
@@ -355,7 +355,7 @@ for iter = 2:maxIter+1
         fprintf('%-8d%-15g%-15g%-15g%-15g\n',iter-1,cost_CD(iter),inf_delta_x,inf_delta_lam,nabla_L(iter));
 
         % scaled termination criterion
-        if nabla_L(iter) <= commonOpts.tolerance_opt*(max(1,abs(full(sol2.f)) + inf_g ))/inf_delta_x
+        if nabla_L(iter) <= (commonOpts.tolerance_opt*max(1,abs(full(sol2.f))) + inf_g )/inf_delta_x
             break
         else
             % set current iterate to previous iterate
@@ -364,7 +364,7 @@ for iter = 2:maxIter+1
         end
 
         % check if current iterate is solved to an acceptable level
-        if nabla_L(iter) <= 10*commonOpts.tolerance_opt*(max(1,abs(full(sol2.f)) + inf_g ))/inf_delta_x
+        if nabla_L(iter) <= (10*commonOpts.tolerance_opt*max(1,abs(full(sol2.f))) + inf_g )/inf_delta_x
 
             % increase counter
             counter_almost_opt_iter = counter_almost_opt_iter +1;

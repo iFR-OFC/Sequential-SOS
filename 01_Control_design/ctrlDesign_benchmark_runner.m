@@ -792,7 +792,6 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 
 total_benchmark_time = toc(total_benchmark_time_start);
-
 total_benchmark_time_h = total_benchmark_time/3600;
 
 fprintf('Total benchmark time: %f second\n', total_benchmark_time);
