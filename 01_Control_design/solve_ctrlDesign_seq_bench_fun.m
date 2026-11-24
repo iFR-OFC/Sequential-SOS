@@ -62,7 +62,7 @@ sos.('g') = [
              s1*(V-b)-nabla(V,x)*subs(f,u,kappa)-l;
              s2*(V-b) + kappa - umin;
              s3*(V-b) + umax - kappa;
-             s4*(V-b) - g
+             % s4*(V-b) -  g
             ];
 
 % states + constraint cones

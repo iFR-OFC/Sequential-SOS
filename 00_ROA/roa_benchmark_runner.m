@@ -78,7 +78,7 @@ commonOpts.eps_cost      = 1e-6;
 commonOpts.small_prog_count = 10;
 commonOpts.maxSolveTime     = 3600;
 commonOpts.almost_opt_count = 10;
-commonOpts.solver           =   'mosek';
+commonOpts.solver           =   'clarabel';
 commonOpts.miniter          = 5; % minimum iterations before an aborted CD run still counts as successful
 
 % MOSEK settings
