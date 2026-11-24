@@ -1,16 +1,5 @@
 % append one row to the results table for a single run:
-% compares coordinate descent (CD) and sequential (SQ) and stores the
-% problem sizes of the underlying SDP (size of A and of the Gram matrices).
-% The first column of each row is the benchmark number ('Prob. No.', as '#<no>')
-%
-% If a fifth argument is given (sequential run with the second Hessian
-% estimation method, cf. enable_second_sequential in the runner), the row
-% is extended by the build time, solve time, iterations, and final cost
-% of that run.
-%
-% If the sixth argument includeSolved is true, a solved column per runner
-% is appended (1 if the run was successful/feasible, 0 otherwise) instead
-% of the unified return status.
+
 function tableRows = appendResultRow(tableRows,probStruct,solStruct_cd,solStruct_seq,solStruct_seq_hessApprox2,includeSolved)
 
 % optional: sequential run with the second Hessian estimation method
@@ -46,8 +35,9 @@ end
 % sequential
 solveTimeSeq  = solStruct_seq.stats.total_solve_time;
 buildTimeSeq  = solStruct_seq.stats.solver_build_time;
-iterationsSeq = solStruct_seq.stats.iterations;
+
 finalCostSeq  = solStruct_seq.stats.single_iterations{end}.cost;
+iterationsSeq = solStruct_seq.stats.iterations;
 timePerIterSeq = solStruct_seq.stats.time_per_iteration;
 
 % size of the underlying SDP matrix A, i.e. number of constraints x number

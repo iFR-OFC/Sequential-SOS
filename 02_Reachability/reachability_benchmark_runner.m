@@ -53,18 +53,18 @@ enable_plot_convergence  = true;
 enable_second_sequential = true;
 
 % Hessian estimation methods of the sequential solver to compare
-hess_est_method_1 = 'regularization_frobenius'; % our default (see also sequentialCommon.m)
-hess_est_method_2 = 'damped_bfgs';      % 'damped_bfgs', 'regularization_levenberg', 'regularization_mirror', 'regularization_frobenius'
+hess_est_method_1 = 'regularization_frobenius'; % our default (see also SequentialCommon.m)
+hess_est_method_2 = 'damped_bfgs';              % 'damped_bfgs', 'regularization_levenberg', 'regularization_mirror', 'regularization_frobenius'
 
 % common options shared by the methods
-commonOpts.maxiter       = 500;
-commonOpts.tolerance_opt = 1e-4;
-commonOpts.eps_cost      = 1e-6;
+commonOpts.maxiter          = 500;
+commonOpts.tolerance_opt    = 1e-4;
+commonOpts.eps_cost         = 1e-6;
 commonOpts.small_prog_count = 10;
-commonOpts.maxSolveTime  = 3600;
+commonOpts.maxSolveTime     = 3600;
 commonOpts.almost_opt_count = 10;
-commonOpts.solver        = 'mosek';
-commonOpts.miniter       = 5; % minimum iterations before an aborted CD run still counts as successful
+commonOpts.solver           = 'mosek';
+commonOpts.miniter          = 5; % minimum iterations before an aborted CD run still counts as successful
 
 % MOSEK settings
 
@@ -108,7 +108,6 @@ seqSolverStructs_regularization = {};
 seqSolverStructs_hessApprox2    = {};
 cdSolverStructs                 = {};
 probNames                       = {}; % problem name per run (for the evaluation output)
-
 
 
 total_benchmark_time_start = tic;
