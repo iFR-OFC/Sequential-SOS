@@ -9,8 +9,8 @@ x1 =x(1)*1;
 x2 =x(2)*1;
 
 % System parameters
-alpha = 1.2;
-beta  = 0.02;
+alpha = 0.1;
+beta  = 0.2;
 c1    = 0.01;
 gamma = 0.04;
 delta = 0.03;
@@ -24,9 +24,16 @@ f = [x1*alpha - x1*x2*beta  - x1*c1*u
 umax =  0.5;
 umin = -0.5;
 
+x0 = [gamma/delta;alpha/beta];
+u0 = 0;
+
+f = subs(f,[x;u],[x+x0;u+u0]);
+
+
+
 
 % generate a desired safe set
-g = x(1)^2 + x(2)^2 - 1;
+g = 1*x(1)^2 + 1*x(2)^2 - 1;
 
 % Lyapunov function candidate
 V = casos.PS.sym('v',monomials(x,degV));

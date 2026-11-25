@@ -32,6 +32,7 @@ addPaths  = { ...
     fullfile(runnerDir,'MultiInput'), ...
     fullfile(runnerDir,'Aircraft_affine'), ...
     fullfile(runnerDir,'Pendubot'),...
+    fullfile(runnerDir,'Lotka-Voltera/'),...
     fullfile(runnerDir,'Satellite'), ...
     fullfile(runnerDir,'..','helperFunctions')};
 
@@ -56,7 +57,7 @@ commonOpts.eps_cost      = 1e-6;
 commonOpts.small_prog_count = 10;
 commonOpts.maxSolveTime  =  3600;
 commonOpts.almost_opt_count = 10;
-commonOpts.solver        = 'clarabel';
+commonOpts.solver        = 'mosek';
 commonOpts.miniter       = 5; % minimum iterations before an aborted CD run still counts as successful
 
 % Solver settings
@@ -217,11 +218,9 @@ for kk = 1:numel(degV)
         end
     end
 end
-%%
-fmt = format;
-format shortE
+
 disp(cell2table(tableRows,'VariableNames',tableVariableNames));
-format(fmt)
+
 
 
 
@@ -229,7 +228,7 @@ format(fmt)
 
 % define the problem instances based on different polynomial degrees
 degV = {2  , 2:4, 1:4, 2:6};
-degK = {1:2, 1:2, 1:2, 1:2};
+degK = {1, 1:2, 1:2, 1:2};
 
 
 for kk = 1:numel(degV)
@@ -334,12 +333,8 @@ for kk = 1:numel(degV)
         end
     end
 end
-%%
-fmt = format;
-format shortE
-disp(cell2table(tableRows,'VariableNames',tableVariableNames));
-format(fmt)
 
+disp(cell2table(tableRows,'VariableNames',tableVariableNames));
 
 
 %% JetEngine
