@@ -306,16 +306,16 @@ for iter = 2:maxIter+1
         % bisection fallback uses mosek: pass its params only if configured
         if  strcmpi(commonOpts.solver,'mosek')
 
-            opts.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
-            opts.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+            opts.sossol_options.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+            opts.sossol_options.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
 
         elseif strcmpi(commonOpts.solver,'clarabel')
 
-            opts.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
+            opts.sossol_options.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
 
         elseif strcmpi(commonOpts.solver,'scs')
 
-            opts.sdpsol_options.scs = commonOpts.sdp_solver_opts;
+            opts.sossol_options.sdpsol_options.scs = commonOpts.sdp_solver_opts;
 
         end
 

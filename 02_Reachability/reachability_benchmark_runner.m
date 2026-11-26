@@ -42,6 +42,7 @@ runnerDir = pwd;
 
 addPaths  = { ...
     fullfile(runnerDir,'VDP'), ...
+    fullfile(runnerDir,'Aircraft'), ...
     fullfile(runnerDir,'..','helperFunctions')};
 
 for ii = 1:numel(addPaths)
@@ -223,6 +224,106 @@ for kk = 1:numel(degV)
 end
 
 % display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
+
+
+%% Aircraft
+
+degV = {1:2 , 2:4};
+degK = {0:1 , 0:1};
+
+
+for kk = 1:numel(degV)
+
+    probStruct_Aircraft = generateAircraft_probStruct(degV{kk},degK{kk});
+
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Reachbility Analysis Benchmark for %s Instance %d of %d. \n', probStruct_Aircraft.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
+
+    x0 = generate_initGuess_Aircraft(probStruct_Aircraft);
+
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_Aircraft_regularization = solve_reachability_seq_bench_fun(probStruct_Aircraft, ...
+                                                                        commonOpts, ...
+                                                                        x0, ...
+                                                                        hess_est_method);
+
+    seqSolverStructs_regularization{end+1} = solStruct_seq_Aircraft_regularization;
+
+    evalSequentialStruct_Aircraft_regularization                 = evalSequential(solStruct_seq_Aircraft_regularization);
+    evalSequentialStruct_Aircraft_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_Aircraft_regularization.probNumber      = kk;
+
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    if enable_second_sequential
+
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_Aircraft_hessApprox2 = solve_reachability_seq_bench_fun(probStruct_Aircraft, ...
+                                                                         commonOpts, ...
+                                                                         x0, ...
+                                                                         hess_est_method);
+
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Aircraft_hessApprox2;
+
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+        evalSequentialStruct_Aircraft_hessApprox2                 = evalSequential(solStruct_seq_Aircraft_hessApprox2);
+        evalSequentialStruct_Aircraft_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_Aircraft_hessApprox2.probNumber      = kk;
+    end
+
+    solStruct_CD_Aircraft = solve_reachability_CD_bench_fun(probStruct_Aircraft,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_Aircraft;
+    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Aircraft.Name, kk, numel(degV));
+
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_Aircraft, ...
+                                    solStruct_CD_Aircraft, ...
+                                    solStruct_seq_Aircraft_regularization, ...
+                                    solStruct_seq_Aircraft_hessApprox2, ...
+                                    true);
+    else
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_Aircraft, ...
+                                    solStruct_CD_Aircraft, ...
+                                    solStruct_seq_Aircraft_regularization, ...
+                                    [], ...
+                                    true);
+    end
+
+    if enable_plot_convergence
+        if enable_second_sequential
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_Aircraft_regularization,...
+                            evalSequentialStruct_Aircraft_hessApprox2,...
+                            solStruct_CD_Aircraft)
+        else
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_Aircraft_regularization,...
+                            [],...
+                            solStruct_CD_Aircraft)
+        end
+    end
+end
+
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 

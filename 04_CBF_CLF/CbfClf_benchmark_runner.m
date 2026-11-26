@@ -26,6 +26,7 @@ runnerDir = pwd;
 
 addPaths  = { ...
     fullfile(runnerDir,'Satellite'), ...
+    fullfile(runnerDir,'Spacecraft_orbit'), ...
     fullfile(runnerDir,'VDP/'), ...
     fullfile(runnerDir,'VDP_coupled/'), ...
    fullfile(runnerDir,'Aircraft_affine/'), ...
@@ -554,6 +555,122 @@ for kk = 1:numel(degV)
                             evalSequentialStruct_Satellite_regularization,...
                             [],...
                             solStruct_CD_Satellite)
+        end
+    end
+end
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
+
+%% Spacecraft_orbit
+
+% define the problem instances based on different polynomial degrees
+degV = {2,2,2:4};
+degH = {2,2:4,2};
+degK = {1,1:2,1:2};
+
+
+for kk = 1:numel(degV)
+
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_Spacecraft_orbit = generateSpacecraft_orbit_probStruct(degV{kk},degH{kk},degK{kk});
+
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('CBF-CLF Benchmark for %s Instance %d of %d. \n', probStruct_Spacecraft_orbit.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
+
+    % generate an initial guess
+    x0 = generate_initGuess_Spacecraft_orbit(probStruct_Spacecraft_orbit);
+
+    % solve Spacecraft_orbit example using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_Spacecraft_orbit_regularization = solve_CbfClf_seq_bench_fun(probStruct_Spacecraft_orbit, ...
+                                                                        commonOpts, ...
+                                                                        x0, ...
+                                                                        hess_est_method);
+
+    seqSolverStructs_regularization{end+1} = solStruct_seq_Spacecraft_orbit_regularization;
+
+    % extract size and timing statistic from sequential and add some meta
+    % data for plotting
+    evalSequentialStruct_Spacecraft_orbit_regularization                 = evalSequential(solStruct_seq_Spacecraft_orbit_regularization);
+    evalSequentialStruct_Spacecraft_orbit_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_Spacecraft_orbit_regularization.probNumber      = kk;
+    evalSequentialStruct_Spacecraft_orbit_hessApprox2 = [];
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    if enable_second_sequential
+
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_Spacecraft_orbit_hessApprox2 = solve_CbfClf_seq_bench_fun(probStruct_Spacecraft_orbit, ...
+                                                                         commonOpts, ...
+                                                                         x0, ...
+                                                                         hess_est_method);
+
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Spacecraft_orbit_hessApprox2;
+
+        % just some gap in display output
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_Spacecraft_orbit_hessApprox2                 = evalSequential(solStruct_seq_Spacecraft_orbit_hessApprox2);
+        evalSequentialStruct_Spacecraft_orbit_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_Spacecraft_orbit_hessApprox2.probNumber      = kk;
+    end
+
+    % solve Spacecraft_orbit example using custom coordinate-descent
+    solStruct_CD_Spacecraft_orbit = solve_CbfClf_CD_bench_fun(probStruct_Spacecraft_orbit,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_Spacecraft_orbit;
+    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Spacecraft_orbit.Name, kk, numel(degV));
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    % append the current run to the accumulating results table
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_Spacecraft_orbit, ...
+                                    solStruct_CD_Spacecraft_orbit, ...
+                                    solStruct_seq_Spacecraft_orbit_regularization, ...
+                                    solStruct_seq_Spacecraft_orbit_hessApprox2, ...
+                                    true);
+    else
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_Spacecraft_orbit, ...
+                                    solStruct_CD_Spacecraft_orbit, ...
+                                    solStruct_seq_Spacecraft_orbit_regularization, ...
+                                    [], ...
+                                    true);
+    end
+
+    if enable_plot_convergence
+        if enable_second_sequential
+            % Evaluate
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_Spacecraft_orbit_regularization,...
+                            evalSequentialStruct_Spacecraft_orbit_hessApprox2,...
+                            solStruct_CD_Spacecraft_orbit)
+        else
+            % Evaluate
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_Spacecraft_orbit_regularization,...
+                            [],...
+                            solStruct_CD_Spacecraft_orbit)
         end
     end
 end
