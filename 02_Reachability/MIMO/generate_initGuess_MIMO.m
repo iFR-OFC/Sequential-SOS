@@ -1,0 +1,46 @@
+function x0 = generate_initGuess_MIMO(probStruct)
+
+
+x = probStruct.x;
+u = probStruct.u;
+t = probStruct.t;
+f = probStruct.f;
+g = probStruct.g;
+
+A0 = full(subs( nabla(f,x),[x;u],zeros(5,1)));
+B0 = full(subs(nabla(f,u),[x;u],zeros(5,1)));
+
+[K,P] = lqr(A0,B0,eye(3),eye(2));
+
+
+
+
+V0      =    x'*P*x; 
+kappa0  =    -K*x; 
+s10     =    (x'*x) + t^2; 
+s20     =    x'*x + t^2; 
+s30     =    ones(length(u),1)*((x'*x) + t^2);
+s40     =    ones(length(u),1)*((x'*x) + t^2);
+s50     =    ones(length(u),1)*((x'*x) + t^2);
+s60     =    ones(length(u),1)*((x'*x) + t^2);
+s70     =    (x'*x) + t^2;
+s80     =    x'*x + t^2;
+s90     =    (x'*x);
+b0      =    0.8;
+
+% initial guess
+x0 = casos.PD([ V0;     ...
+                kappa0 ; ...
+                s10    ;...
+                s20    ;...
+                s30    ;...
+                s40    ;...
+                s50    ;...
+                s60    ;...
+                s70    ;...
+                s80    ;...
+                s90    ;...
+                b0]);
+
+
+end
