@@ -190,6 +190,8 @@ sol_x_it = x0;
 
 UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
 
+useBisection = false;
+
 % number of initial-guess restarts needed until the problem became feasible
 initial_guess_trials = 1;
 
@@ -255,27 +257,90 @@ for iter = 2:maxIter+1
     %% s-step (Prob 1)
     s1start = tic;
 
-    sol1 = S1('p',sol2_x);
+    if useBisection
+        startBuildBisec = tic;
+        useBisection = false;
+        s1_ok = false;
 
-    s1_ok = strcmp(S1.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS');
-    if s1_ok
-        sol1_x = sol1.x;
-        UNIFIED_RETURN_STATUS = S1.stats.UNIFIED_RETURN_STATUS;
+        sos0 = struct('x',[s1;s2;s3;s4;s5;kappa],...
+                      'f',-b,...
+                      'p',[V;h]);
+
+        sos0.('g') = [
+             s1;
+             s2;
+             s3;
+             s4;
+             s5;
+             s1*(h-b) - g;
+             s2*(h-b) - nabla(h,x)*subs(f,u,kappa) - gammaW*(h-b);
+             s3*(h-b) + kappa - umin;
+             s4*(h-b) + umax - kappa;
+             s5*(h-b) - nabla(V,x)*subs(f,u,kappa) - gammaV*V
+             ];
+
+        opts = [];
+        opts.Kx = struct('lin', length(sos0.x));
+        opts.Kc = struct('sos', length(sos0.g));
+        opts.sossol = commonOpts.solver;
+        opts.error_on_fail = 0;
+        opts.sossol_options.newton_solver =[];
+
+        if  strcmpi(commonOpts.solver,'mosek')
+
+            opts.sossol_options.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+            opts.sossol_options.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+
+        elseif strcmpi(commonOpts.solver,'clarabel')
+
+            opts.sossol_options.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
+
+        elseif strcmpi(commonOpts.solver,'scs')
+
+            opts.sossol_options.sdpsol_options.scs = commonOpts.sdp_solver_opts;
+
+        end
+
+        S0 = casos.qcsossol('S','bisection',sos0,opts);
+        buildBisecTime = toc( startBuildBisec );
+
+        solveBisecTime = tic;
+            sol0 = S0('p',casos.PD(sol2_x(1:2)));
+        solveBisecTime = toc(solveBisecTime);
+
+        switch(S0.stats.UNIFIED_RETURN_STATUS)
+            case {'SOLVER_RET_SUCCESS'}
+
+                sol1_x = sol0.x;
+
+            otherwise
+                UNIFIED_RETURN_STATUS = S0.stats.UNIFIED_RETURN_STATUS;
+                break
+        end
+
     else
-        % if we just made a few iterations and become infeasible we
-        % assume the initial guess is bad
-        if iter <= 2
+        sol1 = S1('p',sol2_x);
 
-            sol1_x = sol1_x0;
-
-            initial_guess_trials = 2;
-
-            fprintf('Infeasible in solver 1 in iteration %d. We provide another initial guess. \n',iter-1)
-
-        else
-            fprintf('Infeasible in solver 1 in iteration %d; retaining previous iterate\n', iter-1);
+        s1_ok = strcmp(S1.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS');
+        if s1_ok
+            sol1_x = sol1.x;
             UNIFIED_RETURN_STATUS = S1.stats.UNIFIED_RETURN_STATUS;
-            break
+        else
+            % if we just made a few iterations and become infeasible we
+            % assume the initial guess is bad
+            if iter <= 2
+
+                sol1_x = sol1_x0;
+
+                initial_guess_trials = 2;
+
+                fprintf('Infeasible in solver 1 in iteration %d. We provide another initial guess. \n',iter-1)
+
+            else
+                fprintf('Infeasible in solver 1 in iteration %d; retaining previous iterate\n', iter-1);
+                UNIFIED_RETURN_STATUS = S1.stats.UNIFIED_RETURN_STATUS;
+                break
+            end
         end
     end
 
@@ -298,6 +363,7 @@ for iter = 2:maxIter+1
         if iter <= 2
             fprintf('Infeasible in solver 2 in iteration %d. We try another initial guess! \n',iter-1)
             UNIFIED_RETURN_STATUS = S2.stats.UNIFIED_RETURN_STATUS;
+            useBisection = true;
             sol2_x = [x0(1);
                       x0(2);
                       x0(end)];

@@ -71,7 +71,7 @@ sos.('g') = [
              s7;
              s8;
              s9;
-             b - 1e-6;
+             b ;
              s1*(V-b) - s2*hT - nabla(V,t) - nabla(V,x)*subs(f,u,kappa);
              s3*(V-b) - s4*hT + kappa - umin;
              s5*(V-b) - s6*hT + umax - kappa;

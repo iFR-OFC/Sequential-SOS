@@ -41,8 +41,10 @@ casadiVersion = casadi.CasadiMeta.version;
 runnerDir = pwd;
 
 addPaths  = { ...
-    fullfile(runnerDir,'VDP'), ...
-    fullfile(runnerDir,'Aircraft'), ...
+    fullfile(runnerDir,'VDP/'), ...
+    fullfile(runnerDir,'MIMO/'), ...
+    fullfile(runnerDir,'Aircraft/'), ...
+    fullfile(runnerDir,'Satellite/'),...
     fullfile(runnerDir,'..','helperFunctions')};
 
 for ii = 1:numel(addPaths)
@@ -226,7 +228,118 @@ end
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
+%% MIMO
 
+% define the problem instances based on different polynomial degrees
+degV = {0:2 , 2:4, 0:4};
+degK = {0:1 , 2:4, 0:4};
+
+
+for kk = 1:numel(degV)
+
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_MIMO = generateMIMO_probStruct(degV{kk},degK{kk});
+
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Reachbility Analysis Benchmark for %s Instance %d of %d. \n', probStruct_MIMO.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
+
+    % generate an initial guess
+    x0 = generate_initGuess_MIMO(probStruct_MIMO);
+
+    % solve MIMO example with two states using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_MIMO_regularization = solve_reachability_seq_bench_fun(probStruct_MIMO, ...
+                                                                        commonOpts, ...
+                                                                        x0, ...
+                                                                        hess_est_method);
+
+    seqSolverStructs_regularization{end+1} = solStruct_seq_MIMO_regularization;
+
+    % extract size and timing statistic from sequential and add some meta
+    % data for plotting
+    evalSequentialStruct_MIMO_regularization                 = evalSequential(solStruct_seq_MIMO_regularization);
+    evalSequentialStruct_MIMO_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_MIMO_regularization.probNumber      = kk;
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    if enable_second_sequential
+
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_MIMO_hessApprox2 = solve_reachability_seq_bench_fun(probStruct_MIMO, ...
+                                                                         commonOpts, ...
+                                                                         x0, ...
+                                                                         hess_est_method);
+
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_MIMO_hessApprox2;
+
+        % just some gap in display output
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_MIMO_hessApprox2                 = evalSequential(solStruct_seq_MIMO_hessApprox2);
+        evalSequentialStruct_MIMO_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_MIMO_hessApprox2.probNumber      = kk;
+    end
+
+    % solve MIMO example with two states using custom coordinate-descent
+    solStruct_CD_MIMO = solve_reachability_CD_bench_fun(probStruct_MIMO,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_MIMO;
+    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_MIMO.Name, kk, numel(degV));
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    % append the current run to the accumulating results table
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_MIMO, ...
+                                    solStruct_CD_MIMO, ...
+                                    solStruct_seq_MIMO_regularization, ...
+                                    solStruct_seq_MIMO_hessApprox2, ...
+                                    true);
+    else
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_MIMO, ...
+                                    solStruct_CD_MIMO, ...
+                                    solStruct_seq_MIMO_regularization, ...
+                                    [], ...
+                                    true);
+    end
+
+    if enable_plot_convergence
+        if enable_second_sequential
+            % Evaluate
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_MIMO_regularization,...
+                            evalSequentialStruct_MIMO_hessApprox2,...
+                            solStruct_CD_MIMO)
+        else
+            % Evaluate
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_MIMO_regularization,...
+                            [],...
+                            solStruct_CD_MIMO)
+        end
+    end
+end
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 %% Aircraft
 
@@ -320,6 +433,105 @@ for kk = 1:numel(degV)
                             evalSequentialStruct_Aircraft_regularization,...
                             [],...
                             solStruct_CD_Aircraft)
+        end
+    end
+end
+
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
+
+%% Satellite
+
+degV = {1:2 , 2:4};
+degK = {0:1 , 0:1};
+
+
+for kk = 1:numel(degV)
+
+    probStruct_Satellite = generateSatellite_probStruct(degV{kk},degK{kk});
+
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Reachbility Analysis Benchmark for %s Instance %d of %d. \n', probStruct_Satellite.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
+
+    x0 = generate_initGuess_Satellite(probStruct_Satellite);
+
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_Satellite_regularization = solve_reachability_seq_bench_fun(probStruct_Satellite, ...
+        commonOpts, ...
+        x0, ...
+        hess_est_method);
+
+    seqSolverStructs_regularization{end+1} = solStruct_seq_Satellite_regularization;
+
+    evalSequentialStruct_Satellite_regularization                 = evalSequential(solStruct_seq_Satellite_regularization);
+    evalSequentialStruct_Satellite_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_Satellite_regularization.probNumber      = kk;
+
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    if enable_second_sequential
+
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_Satellite_hessApprox2 = solve_reachability_seq_bench_fun(probStruct_Satellite, ...
+            commonOpts, ...
+            x0, ...
+            hess_est_method);
+
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Satellite_hessApprox2;
+
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+        evalSequentialStruct_Satellite_hessApprox2                 = evalSequential(solStruct_seq_Satellite_hessApprox2);
+        evalSequentialStruct_Satellite_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_Satellite_hessApprox2.probNumber      = kk;
+    end
+
+    solStruct_CD_Satellite = solve_reachability_CD_bench_fun(probStruct_Satellite,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_Satellite;
+    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Satellite.Name, kk, numel(degV));
+
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows, ...
+            probStruct_Satellite, ...
+            solStruct_CD_Satellite, ...
+            solStruct_seq_Satellite_regularization, ...
+            solStruct_seq_Satellite_hessApprox2, ...
+            true);
+    else
+        tableRows = appendResultRow(tableRows, ...
+            probStruct_Satellite, ...
+            solStruct_CD_Satellite, ...
+            solStruct_seq_Satellite_regularization, ...
+            [], ...
+            true);
+    end
+
+    if enable_plot_convergence
+        if enable_second_sequential
+            plotConvergence(probNames{end}, ...
+                enable_second_sequential,...
+                evalSequentialStruct_Satellite_regularization,...
+                evalSequentialStruct_Satellite_hessApprox2,...
+                solStruct_CD_Satellite)
+        else
+            plotConvergence(probNames{end}, ...
+                enable_second_sequential,...
+                evalSequentialStruct_Satellite_regularization,...
+                [],...
+                solStruct_CD_Satellite)
         end
     end
 end

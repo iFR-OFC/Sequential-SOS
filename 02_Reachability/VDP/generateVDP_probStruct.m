@@ -19,7 +19,6 @@ g  = 3*x(2)^2 + x(1)^2 -1;  % g(x) \leq 0
 b  = casos.PS.sym('b');
 
 
-
 % terminal region
 P = [6.4314    0.4580
     0.4580    5.8227];

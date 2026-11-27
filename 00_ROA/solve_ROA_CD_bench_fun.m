@@ -8,6 +8,9 @@ s1      = probStruct.s1;
 V       = probStruct.V;
 b0      = probStruct.b;
 
+% bisection variable for the fallback initial-guess strategy (b0 is constant)
+b       = casos.PS.sym('b');
+
 % enforce positivity
 l = 1e-6*(x'*x);
 
@@ -150,6 +153,8 @@ sol_x_it = x0;
 
 UNIFIED_RETURN_STATUS = 'SOLVER_RET_SUCCESS';
 
+useBisection = false;
+
 % number of initial-guess restarts needed until the problem became feasible
 % (0: first guess feasible, 1: second starter needed, 2: third starter needed)
 initial_guess_trials = 0;
@@ -215,28 +220,91 @@ for iter = 2:maxIter+1
 
     %% s1-step
     s1start = tic;
+    % second fall-back
+    if useBisection
+        startBuildBisec = tic;
+        useBisection = false;
+        s1_ok = false;
 
-    sol1 = S1('p',Vval);
+        % solver 0: bisection on the level b (b0 is constant in ROA)
+        sos0 = struct('x',s1,...            % decision variables
+                      'f',-b,...            % cost
+                      'p',V);               % parameter
 
-    s1_ok = strcmp(S1.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS');
-    if s1_ok
-        s1val = sol1.x;
-        UNIFIED_RETURN_STATUS = S1.stats.UNIFIED_RETURN_STATUS;
+        % SOS constraints (same as S1, but with b instead of the constant b0)
+        sos0.('g') = [
+                      s1;
+                      s1*(V-b)-nabla(V,x)*f-l
+                     ];
+
+
+        % states + constraint are SOS cones
+        opts = [];
+        opts.Kx = struct('lin', length(sos0.x));
+        opts.Kc = struct('sos', length(sos0.g));
+        opts.sossol = commonOpts.solver;
+        opts.error_on_fail = 0;
+        opts.sossol_options.newton_solver =[];
+
+        % bisection fallback uses mosek: pass its params only if configured
+        if  strcmpi(commonOpts.solver,'mosek')
+
+            opts.sossol_options.sdpsol_options.mosek_param = commonOpts.sdp_solver_opts.mosek_param;
+            opts.sossol_options.sdpsol_options.mosek_echo  = commonOpts.sdp_solver_opts.mosek_echo;
+
+        elseif strcmpi(commonOpts.solver,'clarabel')
+
+            opts.sossol_options.sdpsol_options.clarabel = commonOpts.sdp_solver_opts;
+
+        elseif strcmpi(commonOpts.solver,'scs')
+
+            opts.sossol_options.sdpsol_options.scs = commonOpts.sdp_solver_opts;
+
+        end
+
+        % build bisection solver
+        S0 = casos.qcsossol('S','bisection',sos0,opts);
+        buildBisecTime = toc( startBuildBisec );
+
+        % evaluate
+        solveBisecTime = tic;
+            sol0 = S0('p',casos.PD(Vval));
+        solveBisecTime = toc(solveBisecTime);
+
+        switch(S0.stats.UNIFIED_RETURN_STATUS)
+            case {'SOLVER_RET_SUCCESS'}
+
+                sol1 = sol0;
+                s1val = sol1.x;
+
+            otherwise
+                UNIFIED_RETURN_STATUS = S0.stats.UNIFIED_RETURN_STATUS;
+                break
+        end
+
     else
-        % if we just made a few iterations and become infeasible we
-        % assume the initial guess is bad
-        if iter <= 2
+        sol1 = S1('p',Vval);
 
-            s1val = x0(2);
-
-            initial_guess_trials = 1;
-
-            fprintf('Infeasible in solver 1 in iteration %d. We provide another initial guess. \n',iter-1)
-
-        else
-            fprintf('Infeasible in solver 1 in iteration %d; retaining previous iterate\n', iter-1);
+        s1_ok = strcmp(S1.stats.UNIFIED_RETURN_STATUS, 'SOLVER_RET_SUCCESS');
+        if s1_ok
+            s1val = sol1.x;
             UNIFIED_RETURN_STATUS = S1.stats.UNIFIED_RETURN_STATUS;
-            break
+        else
+            % if we just made a few iterations and become infeasible we
+            % assume the initial guess is bad
+            if iter <= 2
+
+                s1val = x0(2);
+
+                initial_guess_trials = 1;
+
+                fprintf('Infeasible in solver 1 in iteration %d. We provide another initial guess. \n',iter-1)
+
+            else
+                fprintf('Infeasible in solver 1 in iteration %d; retaining previous iterate\n', iter-1);
+                UNIFIED_RETURN_STATUS = S1.stats.UNIFIED_RETURN_STATUS;
+                break
+            end
         end
     end
 
@@ -256,15 +324,25 @@ for iter = 2:maxIter+1
         Vval = sol2.x(1);
     else
         if iter <= 2
-            fprintf('Infeasible in solver 2 in iteration %d \n',iter-1)
+            fprintf('Infeasible in solver 2 in iteration %d. We try a third initial guess! \n',iter-1)
             UNIFIED_RETURN_STATUS = S2.stats.UNIFIED_RETURN_STATUS;
+            useBisection = true;
+            initial_guess_trials = 3;
         else
             fprintf('Infeasible in solver 2 in iteration %d; retaining previous iterate\n', iter-1);
             UNIFIED_RETURN_STATUS = S2.stats.UNIFIED_RETURN_STATUS;
         end
-        break
+
+        % only break, in case we do not run the third initial guess
+        if ~useBisection
+            break
+        end
     end
 
+
+    % only check if we did not run the bisection to get a feasible initial
+    % guess
+    if ~useBisection
 
     eval_kkt_con_start = tic;
     % extract lagrange multiplier from each subproblem
@@ -345,6 +423,8 @@ for iter = 2:maxIter+1
         % reset
         counter_small_progress = 0;
     end
+
+    end % check if we need bisection
 
     % at the end of the loop, check solve time
     if toc(startSolve_mainLoop) >= maxTime && iter <= maxIter

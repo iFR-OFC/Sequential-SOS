@@ -4,7 +4,8 @@ function [probStruct] = generateMiMo_probStruct(degV,degS)
 x = casos.Indeterminates('x',3,1);
 u = casos.Indeterminates('u',2,1);
 
-
+% time
+t  = casos.PS('t');
 
 f0 = [-x(1) + x(2)^2; -2*x(2) ; 3*x(3) + x(2)^3];
 g1 = [-2; 1 + x(3)^2 ; 1 + 4*x(1)^2];

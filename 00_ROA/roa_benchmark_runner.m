@@ -51,7 +51,6 @@ addPaths  = { ...
     fullfile(runnerDir,'VDP'), ...
     fullfile(runnerDir,'VDP_coupled'), ...
     fullfile(runnerDir,'MultiInput'), ...
-    fullfile(runnerDir,'Lorentz'), ...
     fullfile(runnerDir,'DoublePendulum'), ...
     fullfile(runnerDir,'Aircraft'), ...
     fullfile(runnerDir,'Satellite_Att'), ...
@@ -72,13 +71,13 @@ hess_est_method_1 = 'regularization_frobenius'; % our default (see also sequenti
 hess_est_method_2 = 'regularization_levenberg';      % 'damped_bfgs', 'regularization_levenberg', 'regularization_mirror', 'regularization_frobenius'
 
 % common options shared by the methods
-commonOpts.maxiter       = 1000;
+commonOpts.maxiter       = 500;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.eps_cost      = 1e-6;
 commonOpts.small_prog_count = 10;
 commonOpts.maxSolveTime     = 3600;
 commonOpts.almost_opt_count = 10;
-commonOpts.solver           =   'clarabel';
+commonOpts.solver           =  'mosek';
 commonOpts.miniter          = 5; % minimum iterations before an aborted CD run still counts as successful
 
 % MOSEK settings
@@ -365,119 +364,6 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 
 
-%% Lorentz
-
-% define the problem instances based on different polynomial degrees
-degV = {2, 2:4, 2:4, 2:6};
-degS = {2,   2, 2:4, 2:4};
-
-
-for kk = 1:numel(degV)
-
-    % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_Lorentz = generateLorentz_probStruct(degV{kk},degS{kk});
-
-    fprintf('------------------------------------------------------------------------------------------ \n')
-    fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_Lorentz.Name, kk, numel(degV))
-    fprintf('------------------------------------------------------------------------------------------\n')
-
-    % generate an initial guess
-    x0 = generate_initGuess_Lorentz(probStruct_Lorentz);
-
-    % solve Lorentz example with two states using sequential SOS
-    hess_est_method = hess_est_method_1;
-    solStruct_seq_Lorentz_regularization = solve_ROA_seq_bench_fun(probStruct_Lorentz, ...
-                                                                commonOpts, ...
-                                                                x0, ...
-                                                                hess_est_method);
-
-    seqSolverStructs_regularization{end+1} = solStruct_seq_Lorentz_regularization;
-
-    % extract size and timing statistic from sequential
-    evalSequentialStruct_Lorentz_regularization                 = evalSequential(solStruct_seq_Lorentz_regularization);
-    evalSequentialStruct_Lorentz_regularization.hess_est_method = hess_est_method_1;
-    evalSequentialStruct_Lorentz_regularization.probNumber      = kk;
-
-    % just some gap in display output
-    fprintf('\n')
-    fprintf('\n')
-    fprintf('\n')
-    fprintf('\n')
-
-    if enable_second_sequential
-
-        hess_est_method = hess_est_method_2;
-        solStruct_seq_Lorentz_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_Lorentz, ...
-                                                                 commonOpts, ...
-                                                                 x0, ...
-                                                                 hess_est_method);
-
-        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Lorentz_hessApprox2;
-
-        % just some gap in display output
-        fprintf('\n')
-        fprintf('\n')
-        fprintf('\n')
-        fprintf('\n')
-
-        % extract size and timing statistic from sequential
-        evalSequentialStruct_Lorentz_hessApprox2                 = evalSequential(solStruct_seq_Lorentz_hessApprox2);
-        evalSequentialStruct_Lorentz_hessApprox2.hess_est_method = hess_est_method_2;
-        evalSequentialStruct_Lorentz_hessApprox2.probNumber      = kk;
-    end
-
-    % solve Lorentz example with two states using custom coordinate-descent
-    solStruct_CD_Lorentz = solve_ROA_CD_bench_fun(probStruct_Lorentz,commonOpts,x0);
-
-    cdSolverStructs{end+1} = solStruct_CD_Lorentz;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Lorentz.Name, kk, numel(degV));
-
-    % just some gap in display output
-    fprintf('\n')
-    fprintf('\n')
-    fprintf('\n')
-    fprintf('\n')
-
-    % Generate table
-
-    % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_Lorentz, ...
-                                    solStruct_CD_Lorentz, ...
-                                    solStruct_seq_Lorentz_regularization, ...
-                                    solStruct_seq_Lorentz_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_Lorentz, ...
-                                    solStruct_CD_Lorentz, ...
-                                    solStruct_seq_Lorentz_regularization, ...
-                                    [], ...
-                                    true);
-    end
-
-    if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_Lorentz_regularization,...
-                            evalSequentialStruct_Lorentz_hessApprox2,...
-                            solStruct_CD_Lorentz)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_Lorentz_regularization,...
-                            [],...
-                            solStruct_CD_Lorentz)
-        end
-    end
-end
-
-% display the results table accumulated over all runs so far
-disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 %% VDP_coupled
 

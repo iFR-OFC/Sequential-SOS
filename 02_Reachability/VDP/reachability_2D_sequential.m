@@ -26,8 +26,6 @@ import casos.toolboxes.sosopt.*
 % system states
 x = casos.PS('x',2,1);
 
-% time
-t  = casos.PS('t');
 
 % system dynamics
 f = [x(2);

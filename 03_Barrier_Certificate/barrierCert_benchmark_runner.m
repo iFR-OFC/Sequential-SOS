@@ -44,8 +44,10 @@ addPaths  = { ...
     fullfile(runnerDir,'MultiInput'), ...
     fullfile(runnerDir,'Aircraft_affine'), ...
     fullfile(runnerDir,'Pendubot'),...
+    fullfile(runnerDir,'Jet-Engine/'),...
     fullfile(runnerDir,'PowerConverter'),...
     fullfile(runnerDir,'Satellite'), ...
+    fullfile(runnerDir,'Spacecraft_orbit/'), ...
     fullfile(runnerDir,'..','helperFunctions')};
 
 for ii = 1:numel(addPaths)
@@ -234,6 +236,119 @@ end
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
+
+%% Jet-Engine
+
+% define the problem instances based on different polynomial degrees
+degV = {2  , 2:4, 1:4, 2:6};
+degK = {1:2, 1:2, 1:2, 1:2};
+
+
+for kk = 1:numel(degV)
+
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_JetEngine = generateJetEngine_probStruct(degV{kk},degK{kk});
+
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_JetEngine.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
+
+    % generate an initial guess
+    x0 = generate_initGuess_JetEngine(probStruct_JetEngine);
+
+    % solve JetEngine example with two states using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_JetEngine_regularization = solve_barrierCert_seq_bench_fun(probStruct_JetEngine, ...
+                                                                       commonOpts, ...
+                                                                       x0, ...
+                                                                       hess_est_method);
+
+    seqSolverStructs_regularization{end+1} = solStruct_seq_JetEngine_regularization;
+
+    % extract size and timing statistic from sequential and add some meta
+    % data for plotting
+    evalSequentialStruct_JetEngine_regularization                 = evalSequential(solStruct_seq_JetEngine_regularization);
+    evalSequentialStruct_JetEngine_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_JetEngine_regularization.probNumber      = kk;
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    if enable_second_sequential
+
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_JetEngine_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_JetEngine, ...
+                                                                        commonOpts, ...
+                                                                        x0, ...
+                                                                        hess_est_method);
+
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_JetEngine_hessApprox2;
+
+        % just some gap in display output
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_JetEngine_hessApprox2                 = evalSequential(solStruct_seq_JetEngine_hessApprox2);
+        evalSequentialStruct_JetEngine_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_JetEngine_hessApprox2.probNumber      = kk;
+    end
+
+    % solve JetEngine example with two states using custom coordinate-descent
+    solStruct_CD_JetEngine = solve_barrierCert_CD_bench_fun(probStruct_JetEngine,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_JetEngine;
+    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_JetEngine.Name, kk, numel(degV));
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    % append the current run to the accumulating results table
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_JetEngine, ...
+                                    solStruct_CD_JetEngine, ...
+                                    solStruct_seq_JetEngine_regularization, ...
+                                    solStruct_seq_JetEngine_hessApprox2, ...
+                                    true);
+    else
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_JetEngine, ...
+                                    solStruct_CD_JetEngine, ...
+                                    solStruct_seq_JetEngine_regularization, ...
+                                    [], ...
+                                    true);
+    end
+
+    if enable_plot_convergence
+        if enable_second_sequential
+            % Evaluate
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_JetEngine_regularization,...
+                            evalSequentialStruct_JetEngine_hessApprox2,...
+                            solStruct_CD_JetEngine)
+        else
+            % Evaluate
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_JetEngine_regularization,...
+                            [],...
+                            solStruct_CD_JetEngine)
+        end
+    end
+end
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 %% MIMO
 
@@ -575,7 +690,118 @@ end
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
+%% Spacecraft (orbit)
 
+% define the problem instances based on different polynomial degrees
+degV = {2,   2, 2:4};
+degK = {1, 1:2, 1:2};
+
+
+for kk = 1:numel(degV)
+
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_Spacecraft_orbit = generateSpacecraft_orbit_probStruct(degV{kk},degK{kk});
+
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_Spacecraft_orbit.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
+
+    % generate an initial guess
+    x0 = generate_initGuess_Spacecraft_orbit(probStruct_Spacecraft_orbit);
+
+    % solve Spacecraft_orbit example with two states using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_Spacecraft_orbit_regularization = solve_barrierCert_seq_bench_fun(probStruct_Spacecraft_orbit, ...
+                                                                             commonOpts, ...
+                                                                             x0, ...
+                                                                             hess_est_method);
+
+    seqSolverStructs_regularization{end+1} = solStruct_seq_Spacecraft_orbit_regularization;
+
+    % extract size and timing statistic from sequential and add some meta
+    % data for plotting
+    evalSequentialStruct_Spacecraft_orbit_regularization                 = evalSequential(solStruct_seq_Spacecraft_orbit_regularization);
+    evalSequentialStruct_Spacecraft_orbit_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_Spacecraft_orbit_regularization.probNumber      = kk;
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    if enable_second_sequential
+
+        hess_est_method = hess_est_method_2;
+        solStruct_seq_Spacecraft_orbit_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_Spacecraft_orbit, ...
+                                                                              commonOpts, ...
+                                                                              x0, ...
+                                                                              hess_est_method);
+
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Spacecraft_orbit_hessApprox2;
+
+        % just some gap in display output
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_Spacecraft_orbit_hessApprox2                 = evalSequential(solStruct_seq_Spacecraft_orbit_hessApprox2);
+        evalSequentialStruct_Spacecraft_orbit_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_Spacecraft_orbit_hessApprox2.probNumber      = kk;
+    end
+
+    % solve Spacecraft_orbit example with two states using custom coordinate-descent
+    solStruct_CD_Spacecraft_orbit = solve_barrierCert_CD_bench_fun(probStruct_Spacecraft_orbit,commonOpts,x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_Spacecraft_orbit;
+    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Spacecraft_orbit.Name, kk, numel(degV));
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    % append the current run to the accumulating results table
+    if enable_second_sequential
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_Spacecraft_orbit, ...
+                                    solStruct_CD_Spacecraft_orbit, ...
+                                    solStruct_seq_Spacecraft_orbit_regularization, ...
+                                    solStruct_seq_Spacecraft_orbit_hessApprox2, ...
+                                    true);
+    else
+        tableRows = appendResultRow(tableRows, ...
+                                    probStruct_Spacecraft_orbit, ...
+                                    solStruct_CD_Spacecraft_orbit, ...
+                                    solStruct_seq_Spacecraft_orbit_regularization, ...
+                                    [], ...
+                                    true);
+    end
+
+    if enable_plot_convergence
+        if enable_second_sequential
+            % Evaluate
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_Spacecraft_orbit_regularization,...
+                            evalSequentialStruct_Spacecraft_orbit_hessApprox2,...
+                            solStruct_CD_Spacecraft_orbit)
+        else
+            % Evaluate
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_Spacecraft_orbit_regularization,...
+                            [],...
+                            solStruct_CD_Spacecraft_orbit)
+        end
+    end
+end
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 %% Satellite
 
