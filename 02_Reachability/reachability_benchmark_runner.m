@@ -1,22 +1,44 @@
 %% ***********************************************************************
 %
-%  Barrier Certificate Benchmark Test Runner
-%
-%  Benchmark 1: Van-der-Pol Oscillator
-%
-%  Note 1: Each runs uses various combinations of polynomial degrees. For SOS
-%  problem to be feasible or to improve solution quality higher degree are
-%  needed. Hence, with a higher degree more decision variables occur and
-%  the Gram matrices become larger. Therefore, we can check the behavior
-%  for over several benchmark problems, i.e., we have sub-benchmarks so to
-%  say that increase our benchmark set.
-%
-%  Note 2: The user might select a second hessian approximation method for
-%  sequential. This is optional, but interesting in terms of convergence
-%  speed.
+%  Reachability Estimation Benchmark Runner
 %
 %
-% ***********************************************************************
+%   SOS Problem for Reachability Estimation
+%
+%   min      ||g - (V(0)-β)||
+%   V,s,κ,β 
+%
+%   s.j.    s_i                                 is SOS
+%           β                                    is SOS
+%           s1(V-β) - s2 h_T - ∂V/∂t - ∇Vf(x,κ)  is SOS
+%           s3(V-β) - s4 h_T + κ - u_min         is SOS
+%           s5(V-β) - s6 h_T + u_max - κ         is SOS
+%           s7(V-β) - s8 h_T - g                 is SOS
+%           s9(V(T)-β) - g_T                     is SOS
+%
+%   V    - Reachability function
+%   s_i  - SOS multipliers
+%   κ    - Control law
+%   β    - Level set
+%   h_T  - Time polynomial t(T-t)
+%   g    - Safe set
+%   g_T  - Terminal set
+%   T    - Time horizon
+%   u_min, u_max - Control bounds
+%  
+%
+%  Overview
+%  
+%  Benchmark 1: VDP
+%  Benchmark 2: MIMO
+%  Benchmark 3: Aircraft
+%  Benchmark 4: Satellite
+%
+%
+%  License: GNU GENERAL PUBLIC LICENSE Version 3
+%
+%% ***********************************************************************
+
 set(groot, ...
     'defaultTextInterpreter', 'latex', ...
     'defaultAxesTickLabelInterpreter', 'latex', ...
@@ -41,10 +63,10 @@ casadiVersion = casadi.CasadiMeta.version;
 runnerDir = pwd;
 
 addPaths  = { ...
-    fullfile(runnerDir,'VDP/'), ...
-    fullfile(runnerDir,'MIMO/'), ...
-    fullfile(runnerDir,'Aircraft/'), ...
-    fullfile(runnerDir,'Satellite/'),...
+    fullfile(runnerDir,'vdp_reachability'), ...
+    fullfile(runnerDir,'mimo_reachability'), ...
+    fullfile(runnerDir,'aircraft_reachability'), ...
+    fullfile(runnerDir,'satellite_reachability'),...
     fullfile(runnerDir,'..','helperFunctions')};
 
 for ii = 1:numel(addPaths)
@@ -125,14 +147,14 @@ degK = {0:1 , 2:4, 0:4};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_VDP = generateVDP_probStruct(degV{kk},degK{kk});
+    probStruct_VDP = generate_prob_struct_vdp_reachability(degV{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('Reachbility Analysis Benchmark for %s Instance %d of %d. \n', probStruct_VDP.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_VDP(probStruct_VDP);
+    x0 = generate_init_guess_vdp_reachability(probStruct_VDP);
 
     % solve VDP example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -141,6 +163,7 @@ for kk = 1:numel(degV)
                                                                         x0, ...
                                                                         hess_est_method);
 
+    % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_VDP_regularization;
 
     % extract size and timing statistic from sequential and add some meta
@@ -155,14 +178,15 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_VDP_hessApprox2 = solve_reachability_seq_bench_fun(probStruct_VDP, ...
                                                                          commonOpts, ...
                                                                          x0, ...
-                                                                         hess_est_method);
+                                                                         hess_est_method_2);
 
+        % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_VDP_hessApprox2;
 
         % just some gap in display output
@@ -175,13 +199,18 @@ for kk = 1:numel(degV)
         evalSequentialStruct_VDP_hessApprox2                 = evalSequential(solStruct_seq_VDP_hessApprox2);
         evalSequentialStruct_VDP_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_VDP_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_VDP_hessApprox2 = [];
+        solStruct_seq_VDP_hessApprox2        = [];
     end
 
     % solve VDP example with two states using custom coordinate-descent
-    solStruct_CD_VDP = solve_reachability_CD_bench_fun(probStruct_VDP,commonOpts,x0);
+    solStruct_CD_VDP = solve_reachability_CD_bench_fun(probStruct_VDP, ...
+                                                       commonOpts, ...
+                                                       x0);
 
     cdSolverStructs{end+1} = solStruct_CD_VDP;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_VDP.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_VDP.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -190,40 +219,22 @@ for kk = 1:numel(degV)
     fprintf('\n')
 
     % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_VDP, ...
-                                    solStruct_CD_VDP, ...
-                                    solStruct_seq_VDP_regularization, ...
-                                    solStruct_seq_VDP_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_VDP, ...
-                                    solStruct_CD_VDP, ...
-                                    solStruct_seq_VDP_regularization, ...
-                                    [], ...
-                                    true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_VDP, ...
+                                solStruct_CD_VDP, ...
+                                solStruct_seq_VDP_regularization, ...
+                                solStruct_seq_VDP_hessApprox2, ...
+                                true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_VDP_regularization,...
                             evalSequentialStruct_VDP_hessApprox2,...
                             solStruct_CD_VDP)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_VDP_regularization,...
-                            [],...
-                            solStruct_CD_VDP)
-        end
     end
-end
+end % end of for-loop for VDP benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
@@ -238,14 +249,14 @@ degK = {0:1 , 2:4, 0:4};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_MIMO = generateMIMO_probStruct(degV{kk},degK{kk});
+    probStruct_MIMO = generate_prob_struct_mimo_reachability(degV{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('Reachbility Analysis Benchmark for %s Instance %d of %d. \n', probStruct_MIMO.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_MIMO(probStruct_MIMO);
+    x0 = generate_init_guess_mimo_reachability(probStruct_MIMO);
 
     % solve MIMO example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -254,6 +265,7 @@ for kk = 1:numel(degV)
                                                                         x0, ...
                                                                         hess_est_method);
 
+    % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_MIMO_regularization;
 
     % extract size and timing statistic from sequential and add some meta
@@ -268,14 +280,15 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_MIMO_hessApprox2 = solve_reachability_seq_bench_fun(probStruct_MIMO, ...
                                                                          commonOpts, ...
                                                                          x0, ...
-                                                                         hess_est_method);
+                                                                         hess_est_method_2);
 
+        % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_MIMO_hessApprox2;
 
         % just some gap in display output
@@ -288,13 +301,18 @@ for kk = 1:numel(degV)
         evalSequentialStruct_MIMO_hessApprox2                 = evalSequential(solStruct_seq_MIMO_hessApprox2);
         evalSequentialStruct_MIMO_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_MIMO_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_MIMO_hessApprox2 = [];
+        solStruct_seq_MIMO_hessApprox2        = [];
     end
 
     % solve MIMO example with two states using custom coordinate-descent
-    solStruct_CD_MIMO = solve_reachability_CD_bench_fun(probStruct_MIMO,commonOpts,x0);
+    solStruct_CD_MIMO = solve_reachability_CD_bench_fun(probStruct_MIMO, ...
+                                                        commonOpts, ...
+                                                        x0);
 
     cdSolverStructs{end+1} = solStruct_CD_MIMO;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_MIMO.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_MIMO.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -303,40 +321,22 @@ for kk = 1:numel(degV)
     fprintf('\n')
 
     % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_MIMO, ...
-                                    solStruct_CD_MIMO, ...
-                                    solStruct_seq_MIMO_regularization, ...
-                                    solStruct_seq_MIMO_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_MIMO, ...
-                                    solStruct_CD_MIMO, ...
-                                    solStruct_seq_MIMO_regularization, ...
-                                    [], ...
-                                    true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_MIMO, ...
+                                solStruct_CD_MIMO, ...
+                                solStruct_seq_MIMO_regularization, ...
+                                solStruct_seq_MIMO_hessApprox2, ...
+                                true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_MIMO_regularization,...
                             evalSequentialStruct_MIMO_hessApprox2,...
                             solStruct_CD_MIMO)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_MIMO_regularization,...
-                            [],...
-                            solStruct_CD_MIMO)
-        end
     end
-end
+end % end of for-loop for MIMO benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
@@ -349,13 +349,13 @@ degK = {0:1 , 0:1};
 
 for kk = 1:numel(degV)
 
-    probStruct_Aircraft = generateAircraft_probStruct(degV{kk},degK{kk});
+    probStruct_Aircraft = generate_prob_struct_aircraft_reachability(degV{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('Reachbility Analysis Benchmark for %s Instance %d of %d. \n', probStruct_Aircraft.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
-    x0 = generate_initGuess_Aircraft(probStruct_Aircraft);
+    x0 = generate_init_guess_aircraft_reachability(probStruct_Aircraft);
 
     hess_est_method = hess_est_method_1;
     solStruct_seq_Aircraft_regularization = solve_reachability_seq_bench_fun(probStruct_Aircraft, ...
@@ -363,6 +363,7 @@ for kk = 1:numel(degV)
                                                                         x0, ...
                                                                         hess_est_method);
 
+    % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_Aircraft_regularization;
 
     evalSequentialStruct_Aircraft_regularization                 = evalSequential(solStruct_seq_Aircraft_regularization);
@@ -374,14 +375,15 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_Aircraft_hessApprox2 = solve_reachability_seq_bench_fun(probStruct_Aircraft, ...
                                                                          commonOpts, ...
                                                                          x0, ...
-                                                                         hess_est_method);
+                                                                         hess_est_method_2);
 
+        % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Aircraft_hessApprox2;
 
         fprintf('\n')
@@ -392,51 +394,41 @@ for kk = 1:numel(degV)
         evalSequentialStruct_Aircraft_hessApprox2                 = evalSequential(solStruct_seq_Aircraft_hessApprox2);
         evalSequentialStruct_Aircraft_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_Aircraft_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_Aircraft_hessApprox2 = [];
+        solStruct_seq_Aircraft_hessApprox2        = [];
     end
 
-    solStruct_CD_Aircraft = solve_reachability_CD_bench_fun(probStruct_Aircraft,commonOpts,x0);
+    solStruct_CD_Aircraft = solve_reachability_CD_bench_fun(probStruct_Aircraft, ...
+                                                            commonOpts, ...
+                                                            x0);
 
     cdSolverStructs{end+1} = solStruct_CD_Aircraft;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Aircraft.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_Aircraft.Name, kk, numel(degV), commonOpts.solver);
 
     fprintf('\n')
     fprintf('\n')
     fprintf('\n')
     fprintf('\n')
 
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_Aircraft, ...
-                                    solStruct_CD_Aircraft, ...
-                                    solStruct_seq_Aircraft_regularization, ...
-                                    solStruct_seq_Aircraft_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_Aircraft, ...
-                                    solStruct_CD_Aircraft, ...
-                                    solStruct_seq_Aircraft_regularization, ...
-                                    [], ...
-                                    true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_Aircraft, ...
+                                solStruct_CD_Aircraft, ...
+                                solStruct_seq_Aircraft_regularization, ...
+                                solStruct_seq_Aircraft_hessApprox2, ...
+                                true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_Aircraft_regularization,...
                             evalSequentialStruct_Aircraft_hessApprox2,...
                             solStruct_CD_Aircraft)
-        else
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_Aircraft_regularization,...
-                            [],...
-                            solStruct_CD_Aircraft)
-        end
     end
-end
+end % end of for-loop for Aircraft benchmark
 
+% display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 
@@ -448,13 +440,13 @@ degK = {0:1 , 0:1};
 
 for kk = 1:numel(degV)
 
-    probStruct_Satellite = generateSatellite_probStruct(degV{kk},degK{kk});
+    probStruct_Satellite = generate_prob_struct_satellite_reachability(degV{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('Reachbility Analysis Benchmark for %s Instance %d of %d. \n', probStruct_Satellite.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
-    x0 = generate_initGuess_Satellite(probStruct_Satellite);
+    x0 = generate_init_guess_satellite_reachability(probStruct_Satellite);
 
     hess_est_method = hess_est_method_1;
     solStruct_seq_Satellite_regularization = solve_reachability_seq_bench_fun(probStruct_Satellite, ...
@@ -462,6 +454,7 @@ for kk = 1:numel(degV)
         x0, ...
         hess_est_method);
 
+    % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_Satellite_regularization;
 
     evalSequentialStruct_Satellite_regularization                 = evalSequential(solStruct_seq_Satellite_regularization);
@@ -473,14 +466,15 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_Satellite_hessApprox2 = solve_reachability_seq_bench_fun(probStruct_Satellite, ...
             commonOpts, ...
             x0, ...
-            hess_est_method);
+            hess_est_method_2);
 
+        % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Satellite_hessApprox2;
 
         fprintf('\n')
@@ -491,51 +485,41 @@ for kk = 1:numel(degV)
         evalSequentialStruct_Satellite_hessApprox2                 = evalSequential(solStruct_seq_Satellite_hessApprox2);
         evalSequentialStruct_Satellite_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_Satellite_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_Satellite_hessApprox2 = [];
+        solStruct_seq_Satellite_hessApprox2        = [];
     end
 
-    solStruct_CD_Satellite = solve_reachability_CD_bench_fun(probStruct_Satellite,commonOpts,x0);
+    solStruct_CD_Satellite = solve_reachability_CD_bench_fun(probStruct_Satellite, ...
+                                                             commonOpts, ...
+                                                             x0);
 
     cdSolverStructs{end+1} = solStruct_CD_Satellite;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Satellite.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_Satellite.Name, kk, numel(degV), commonOpts.solver);
 
     fprintf('\n')
     fprintf('\n')
     fprintf('\n')
     fprintf('\n')
 
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-            probStruct_Satellite, ...
-            solStruct_CD_Satellite, ...
-            solStruct_seq_Satellite_regularization, ...
-            solStruct_seq_Satellite_hessApprox2, ...
-            true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-            probStruct_Satellite, ...
-            solStruct_CD_Satellite, ...
-            solStruct_seq_Satellite_regularization, ...
-            [], ...
-            true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+        probStruct_Satellite, ...
+        solStruct_CD_Satellite, ...
+        solStruct_seq_Satellite_regularization, ...
+        solStruct_seq_Satellite_hessApprox2, ...
+        true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
             plotConvergence(probNames{end}, ...
                 enable_second_sequential,...
                 evalSequentialStruct_Satellite_regularization,...
                 evalSequentialStruct_Satellite_hessApprox2,...
                 solStruct_CD_Satellite)
-        else
-            plotConvergence(probNames{end}, ...
-                enable_second_sequential,...
-                evalSequentialStruct_Satellite_regularization,...
-                [],...
-                solStruct_CD_Satellite)
-        end
     end
-end
+end % end of for-loop for Satellite benchmark
 
+% display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 

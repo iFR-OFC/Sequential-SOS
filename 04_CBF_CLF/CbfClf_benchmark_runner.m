@@ -1,7 +1,47 @@
 %% ***********************************************************************
 %
-%  CBF-CLF Benchmark Test Runner
-% ***********************************************************************
+%  CBF-CLF Benchmark Runner
+%
+%
+%   SOS Problem for CBF-CLF
+%
+%   min      ||g - (h-β)||
+%   V,h,s,κ,β 
+%
+%   s.j.    s_i                            is SOS
+%           V  - ϵ(x)                      is SOS
+%           β  - ϵ                         is SOS
+%           s1(h-β) - g                    is SOS
+%           s2(h-β) - ∇hf(x,κ) - γ_W(h-β)  is SOS
+%           s3(h-β) + κ - u_min            is SOS
+%           s4(h-β) + u_max - κ            is SOS
+%           s5(h-β) - ∇Vf(x,κ) - γ_V V     is SOS
+%
+%   V    - Control Lyapunov function
+%   h    - Control barrier function
+%   s_i  - SOS multipliers
+%   κ    - Control law
+%   β    - Level set
+%   γ_V, γ_W - Dissipation rates
+%   ϵ(x) - Small term
+%   g    - Safe set/desired operating region
+%   u_min, u_max - Control bounds
+%  
+%
+%  Overview
+%  
+%  Benchmark 1: VDP
+%  Benchmark 2: Power-Converter
+%  Benchmark 3: VDP_coupled
+%  Benchmark 4: Aircraft_affine
+%  Benchmark 5: Satellite
+%  Benchmark 6: Spacecraft_orbit
+%
+%
+%  License: GNU GENERAL PUBLIC LICENSE Version 3
+%
+%% ***********************************************************************
+
 set(groot, ...
     'defaultTextInterpreter', 'latex', ...
     'defaultAxesTickLabelInterpreter', 'latex', ...
@@ -25,12 +65,12 @@ casadiVersion = casadi.CasadiMeta.version;
 runnerDir = pwd;
 
 addPaths  = { ...
-    fullfile(runnerDir,'Satellite'), ...
-    fullfile(runnerDir,'Spacecraft_orbit'), ...
-    fullfile(runnerDir,'VDP/'), ...
-    fullfile(runnerDir,'PowerConverter/'), ...
-    fullfile(runnerDir,'VDP_coupled/'), ...
-   fullfile(runnerDir,'Aircraft_affine/'), ...
+    fullfile(runnerDir,'satellite_cbf_clf'), ...
+    fullfile(runnerDir,'spacecraft_orbit_cbf_clf'), ...
+    fullfile(runnerDir,'vdp_cbf_clf'), ...
+    fullfile(runnerDir,'power_conv_cbf_clf'), ...
+    fullfile(runnerDir,'vdp_coupled_cbf_clf'), ...
+   fullfile(runnerDir,'aircraft_affine_cbf_clf'), ...
     fullfile(runnerDir,'..','helperFunctions')};
 
 for ii = 1:numel(addPaths)
@@ -112,14 +152,14 @@ degK = {1, 1, 1:2,  1:2};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_VDP = generateVDP_probStruct(degV{kk},degH{kk},degK{kk});
+    probStruct_VDP = generate_prob_struct_vdp_cbf_clf(degV{kk},degH{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('CBF-CLF Benchmark for %s Instance %d of %d. \n', probStruct_VDP.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_VDP(probStruct_VDP);
+    x0 = generate_init_guess_vdp_cbf_clf(probStruct_VDP);
 
     % solve VDP example using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -128,6 +168,7 @@ for kk = 1:numel(degV)
                                                                         x0, ...
                                                                         hess_est_method);
 
+    % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_VDP_regularization;
 
     % extract size and timing statistic from sequential and add some meta
@@ -135,7 +176,6 @@ for kk = 1:numel(degV)
     evalSequentialStruct_VDP_regularization                 = evalSequential(solStruct_seq_VDP_regularization);
     evalSequentialStruct_VDP_regularization.hess_est_method = hess_est_method_1;
     evalSequentialStruct_VDP_regularization.probNumber      = kk;
-    evalSequentialStruct_VDP_hessApprox2 = [];
 
     % just some gap in display output
     fprintf('\n')
@@ -143,14 +183,15 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_VDP_hessApprox2 = solve_CbfClf_seq_bench_fun(probStruct_VDP, ...
                                                                          commonOpts, ...
                                                                          x0, ...
-                                                                         hess_est_method);
+                                                                         hess_est_method_2);
 
+        % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_VDP_hessApprox2;
 
         % just some gap in display output
@@ -163,13 +204,18 @@ for kk = 1:numel(degV)
         evalSequentialStruct_VDP_hessApprox2                 = evalSequential(solStruct_seq_VDP_hessApprox2);
         evalSequentialStruct_VDP_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_VDP_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_VDP_hessApprox2 = [];
+        solStruct_seq_VDP_hessApprox2        = [];
     end
 
     % solve VDP example using custom coordinate-descent
-    solStruct_CD_VDP = solve_CbfClf_CD_bench_fun(probStruct_VDP,commonOpts,x0);
+    solStruct_CD_VDP = solve_CbfClf_CD_bench_fun(probStruct_VDP, ...
+                                                 commonOpts, ...
+                                                 x0);
 
     cdSolverStructs{end+1} = solStruct_CD_VDP;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_VDP.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_VDP.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -178,40 +224,22 @@ for kk = 1:numel(degV)
     fprintf('\n')
 
     % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_VDP, ...
-                                    solStruct_CD_VDP, ...
-                                    solStruct_seq_VDP_regularization, ...
-                                    solStruct_seq_VDP_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_VDP, ...
-                                    solStruct_CD_VDP, ...
-                                    solStruct_seq_VDP_regularization, ...
-                                    [], ...
-                                    true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_VDP, ...
+                                solStruct_CD_VDP, ...
+                                solStruct_seq_VDP_regularization, ...
+                                solStruct_seq_VDP_hessApprox2, ...
+                                true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_VDP_regularization,...
                             evalSequentialStruct_VDP_hessApprox2,...
                             solStruct_CD_VDP)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_VDP_regularization,...
-                            [],...
-                            solStruct_CD_VDP)
-        end
     end
-end
+end % end of for-loop for VDP benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
@@ -227,14 +255,14 @@ degK = {1, 1, 1:2,  1:2};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_PowerConv = generatePowerConv_probStruct(degV{kk},degH{kk},degK{kk});
+    probStruct_PowerConv = generate_prob_struct_power_conv_cbf_clf(degV{kk},degH{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('CBF-CLF Benchmark for %s Instance %d of %d. \n', probStruct_PowerConv.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_PowerConv(probStruct_PowerConv);
+    x0 = generate_init_guess_power_conv_cbf_clf(probStruct_PowerConv);
 
     % solve PowerConv example using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -243,6 +271,7 @@ for kk = 1:numel(degV)
                                                                         x0, ...
                                                                         hess_est_method);
 
+    % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_PowerConv_regularization;
 
     % extract size and timing statistic from sequential and add some meta
@@ -250,7 +279,6 @@ for kk = 1:numel(degV)
     evalSequentialStruct_PowerConv_regularization                 = evalSequential(solStruct_seq_PowerConv_regularization);
     evalSequentialStruct_PowerConv_regularization.hess_est_method = hess_est_method_1;
     evalSequentialStruct_PowerConv_regularization.probNumber      = kk;
-    evalSequentialStruct_PowerConv_hessApprox2 = [];
 
     % just some gap in display output
     fprintf('\n')
@@ -258,14 +286,15 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_PowerConv_hessApprox2 = solve_CbfClf_seq_bench_fun(probStruct_PowerConv, ...
                                                                          commonOpts, ...
                                                                          x0, ...
-                                                                         hess_est_method);
+                                                                         hess_est_method_2);
 
+        % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_PowerConv_hessApprox2;
 
         % just some gap in display output
@@ -278,13 +307,18 @@ for kk = 1:numel(degV)
         evalSequentialStruct_PowerConv_hessApprox2                 = evalSequential(solStruct_seq_PowerConv_hessApprox2);
         evalSequentialStruct_PowerConv_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_PowerConv_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_PowerConv_hessApprox2 = [];
+        solStruct_seq_PowerConv_hessApprox2        = [];
     end
 
     % solve PowerConv example using custom coordinate-descent
-    solStruct_CD_PowerConv = solve_CbfClf_CD_bench_fun(probStruct_PowerConv,commonOpts,x0);
+    solStruct_CD_PowerConv = solve_CbfClf_CD_bench_fun(probStruct_PowerConv, ...
+                                                       commonOpts, ...
+                                                       x0);
 
     cdSolverStructs{end+1} = solStruct_CD_PowerConv;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_PowerConv.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_PowerConv.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -293,40 +327,22 @@ for kk = 1:numel(degV)
     fprintf('\n')
 
     % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_PowerConv, ...
-                                    solStruct_CD_PowerConv, ...
-                                    solStruct_seq_PowerConv_regularization, ...
-                                    solStruct_seq_PowerConv_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_PowerConv, ...
-                                    solStruct_CD_PowerConv, ...
-                                    solStruct_seq_PowerConv_regularization, ...
-                                    [], ...
-                                    true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_PowerConv, ...
+                                solStruct_CD_PowerConv, ...
+                                solStruct_seq_PowerConv_regularization, ...
+                                solStruct_seq_PowerConv_hessApprox2, ...
+                                true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_PowerConv_regularization,...
                             evalSequentialStruct_PowerConv_hessApprox2,...
                             solStruct_CD_PowerConv)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_PowerConv_regularization,...
-                            [],...
-                            solStruct_CD_PowerConv)
-        end
     end
-end
+end % end of for-loop for Power-Converter benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
@@ -342,14 +358,14 @@ degK = {1, 1, 1:2,  1:2};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_VDP_coupled = generateVDP_coupled_probStruct(degV{kk},degH{kk},degK{kk});
+    probStruct_VDP_coupled = generate_prob_struct_vdp_coupled_cbf_clf(degV{kk},degH{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('CBF-CLF Benchmark for %s Instance %d of %d. \n', probStruct_VDP_coupled.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_VDP_coupled(probStruct_VDP_coupled);
+    x0 = generate_init_guess_vdp_coupled_cbf_clf(probStruct_VDP_coupled);
 
     % solve VDP_coupled example using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -358,6 +374,7 @@ for kk = 1:numel(degV)
                                                                         x0, ...
                                                                         hess_est_method);
 
+    % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_VDP_coupled_regularization;
 
     % extract size and timing statistic from sequential and add some meta
@@ -365,7 +382,6 @@ for kk = 1:numel(degV)
     evalSequentialStruct_VDP_coupled_regularization                 = evalSequential(solStruct_seq_VDP_coupled_regularization);
     evalSequentialStruct_VDP_coupled_regularization.hess_est_method = hess_est_method_1;
     evalSequentialStruct_VDP_coupled_regularization.probNumber      = kk;
-    evalSequentialStruct_VDP_coupled_hessApprox2 = [];
 
     % just some gap in display output
     fprintf('\n')
@@ -373,14 +389,15 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_VDP_coupled_hessApprox2 = solve_CbfClf_seq_bench_fun(probStruct_VDP_coupled, ...
                                                                          commonOpts, ...
                                                                          x0, ...
-                                                                         hess_est_method);
+                                                                         hess_est_method_2);
 
+        % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_VDP_coupled_hessApprox2;
 
         % just some gap in display output
@@ -393,13 +410,18 @@ for kk = 1:numel(degV)
         evalSequentialStruct_VDP_coupled_hessApprox2                 = evalSequential(solStruct_seq_VDP_coupled_hessApprox2);
         evalSequentialStruct_VDP_coupled_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_VDP_coupled_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_VDP_coupled_hessApprox2 = [];
+        solStruct_seq_VDP_coupled_hessApprox2        = [];
     end
 
     % solve VDP_coupled example using custom coordinate-descent
-    solStruct_CD_VDP_coupled = solve_CbfClf_CD_bench_fun(probStruct_VDP_coupled,commonOpts,x0);
+    solStruct_CD_VDP_coupled = solve_CbfClf_CD_bench_fun(probStruct_VDP_coupled, ...
+                                                         commonOpts, ...
+                                                         x0);
 
     cdSolverStructs{end+1} = solStruct_CD_VDP_coupled;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_VDP_coupled.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_VDP_coupled.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -408,40 +430,22 @@ for kk = 1:numel(degV)
     fprintf('\n')
 
     % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_VDP_coupled, ...
-                                    solStruct_CD_VDP_coupled, ...
-                                    solStruct_seq_VDP_coupled_regularization, ...
-                                    solStruct_seq_VDP_coupled_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_VDP_coupled, ...
-                                    solStruct_CD_VDP_coupled, ...
-                                    solStruct_seq_VDP_coupled_regularization, ...
-                                    [], ...
-                                    true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_VDP_coupled, ...
+                                solStruct_CD_VDP_coupled, ...
+                                solStruct_seq_VDP_coupled_regularization, ...
+                                solStruct_seq_VDP_coupled_hessApprox2, ...
+                                true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_VDP_coupled_regularization,...
                             evalSequentialStruct_VDP_coupled_hessApprox2,...
                             solStruct_CD_VDP_coupled)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_VDP_coupled_regularization,...
-                            [],...
-                            solStruct_CD_VDP_coupled)
-        end
     end
-end
+end % end of for-loop for VDP_coupled benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
@@ -458,14 +462,14 @@ degK = {1, 1, 1:2,  1:2};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_Aircraft_affine = generateAircraft_affine_probStruct(degV{kk},degH{kk},degK{kk});
+    probStruct_Aircraft_affine = generate_prob_struct_aircraft_affine_cbf_clf(degV{kk},degH{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('CBF-CLF Benchmark for %s Instance %d of %d. \n', probStruct_Aircraft_affine.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_Aircraft_affine(probStruct_Aircraft_affine);
+    x0 = generate_init_guess_aircraft_affine_cbf_clf(probStruct_Aircraft_affine);
 
     % solve Aircraft_affine example using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -474,6 +478,7 @@ for kk = 1:numel(degV)
                                                                         x0, ...
                                                                         hess_est_method);
 
+    % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_Aircraft_affine_regularization;
 
     % extract size and timing statistic from sequential and add some meta
@@ -481,7 +486,6 @@ for kk = 1:numel(degV)
     evalSequentialStruct_Aircraft_affine_regularization                 = evalSequential(solStruct_seq_Aircraft_affine_regularization);
     evalSequentialStruct_Aircraft_affine_regularization.hess_est_method = hess_est_method_1;
     evalSequentialStruct_Aircraft_affine_regularization.probNumber      = kk;
-    evalSequentialStruct_Aircraft_affine_hessApprox2 = [];
 
     % just some gap in display output
     fprintf('\n')
@@ -489,14 +493,15 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_Aircraft_affine_hessApprox2 = solve_CbfClf_seq_bench_fun(probStruct_Aircraft_affine, ...
                                                                          commonOpts, ...
                                                                          x0, ...
-                                                                         hess_est_method);
+                                                                         hess_est_method_2);
 
+        % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Aircraft_affine_hessApprox2;
 
         % just some gap in display output
@@ -509,13 +514,18 @@ for kk = 1:numel(degV)
         evalSequentialStruct_Aircraft_affine_hessApprox2                 = evalSequential(solStruct_seq_Aircraft_affine_hessApprox2);
         evalSequentialStruct_Aircraft_affine_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_Aircraft_affine_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_Aircraft_affine_hessApprox2 = [];
+        solStruct_seq_Aircraft_affine_hessApprox2        = [];
     end
 
     % solve Aircraft_affine example using custom coordinate-descent
-    solStruct_CD_Aircraft_affine = solve_CbfClf_CD_bench_fun(probStruct_Aircraft_affine,commonOpts,x0);
+    solStruct_CD_Aircraft_affine = solve_CbfClf_CD_bench_fun(probStruct_Aircraft_affine, ...
+                                                             commonOpts, ...
+                                                             x0);
 
     cdSolverStructs{end+1} = solStruct_CD_Aircraft_affine;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Aircraft_affine.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_Aircraft_affine.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -524,40 +534,22 @@ for kk = 1:numel(degV)
     fprintf('\n')
 
     % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_Aircraft_affine, ...
-                                    solStruct_CD_Aircraft_affine, ...
-                                    solStruct_seq_Aircraft_affine_regularization, ...
-                                    solStruct_seq_Aircraft_affine_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_Aircraft_affine, ...
-                                    solStruct_CD_Aircraft_affine, ...
-                                    solStruct_seq_Aircraft_affine_regularization, ...
-                                    [], ...
-                                    true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_Aircraft_affine, ...
+                                solStruct_CD_Aircraft_affine, ...
+                                solStruct_seq_Aircraft_affine_regularization, ...
+                                solStruct_seq_Aircraft_affine_hessApprox2, ...
+                                true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_Aircraft_affine_regularization,...
                             evalSequentialStruct_Aircraft_affine_hessApprox2,...
                             solStruct_CD_Aircraft_affine)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_Aircraft_affine_regularization,...
-                            [],...
-                            solStruct_CD_Aircraft_affine)
-        end
     end
-end
+end % end of for-loop for Aircraft_affine benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
@@ -574,14 +566,14 @@ degK = {1,1:2,1:2};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_Satellite = generateSatellite_probStruct(degV{kk},degH{kk},degK{kk});
+    probStruct_Satellite = generate_prob_struct_satellite_cbf_clf(degV{kk},degH{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('CBF-CLF Benchmark for %s Instance %d of %d. \n', probStruct_Satellite.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_Satellite(probStruct_Satellite);
+    x0 = generate_init_guess_satellite_cbf_clf(probStruct_Satellite);
 
     % solve Satellite example using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -590,6 +582,7 @@ for kk = 1:numel(degV)
                                                                         x0, ...
                                                                         hess_est_method);
 
+    % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_Satellite_regularization;
 
     % extract size and timing statistic from sequential and add some meta
@@ -597,7 +590,6 @@ for kk = 1:numel(degV)
     evalSequentialStruct_Satellite_regularization                 = evalSequential(solStruct_seq_Satellite_regularization);
     evalSequentialStruct_Satellite_regularization.hess_est_method = hess_est_method_1;
     evalSequentialStruct_Satellite_regularization.probNumber      = kk;
-    evalSequentialStruct_Satellite_hessApprox2 = [];
 
     % just some gap in display output
     fprintf('\n')
@@ -605,14 +597,15 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_Satellite_hessApprox2 = solve_CbfClf_seq_bench_fun(probStruct_Satellite, ...
                                                                          commonOpts, ...
                                                                          x0, ...
-                                                                         hess_est_method);
+                                                                         hess_est_method_2);
 
+        % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Satellite_hessApprox2;
 
         % just some gap in display output
@@ -625,13 +618,18 @@ for kk = 1:numel(degV)
         evalSequentialStruct_Satellite_hessApprox2                 = evalSequential(solStruct_seq_Satellite_hessApprox2);
         evalSequentialStruct_Satellite_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_Satellite_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_Satellite_hessApprox2 = [];
+        solStruct_seq_Satellite_hessApprox2        = [];
     end
 
     % solve Satellite example using custom coordinate-descent
-    solStruct_CD_Satellite = solve_CbfClf_CD_bench_fun(probStruct_Satellite,commonOpts,x0);
+    solStruct_CD_Satellite = solve_CbfClf_CD_bench_fun(probStruct_Satellite, ...
+                                                       commonOpts, ...
+                                                       x0);
 
     cdSolverStructs{end+1} = solStruct_CD_Satellite;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Satellite.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_Satellite.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -640,40 +638,22 @@ for kk = 1:numel(degV)
     fprintf('\n')
 
     % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_Satellite, ...
-                                    solStruct_CD_Satellite, ...
-                                    solStruct_seq_Satellite_regularization, ...
-                                    solStruct_seq_Satellite_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_Satellite, ...
-                                    solStruct_CD_Satellite, ...
-                                    solStruct_seq_Satellite_regularization, ...
-                                    [], ...
-                                    true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_Satellite, ...
+                                solStruct_CD_Satellite, ...
+                                solStruct_seq_Satellite_regularization, ...
+                                solStruct_seq_Satellite_hessApprox2, ...
+                                true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_Satellite_regularization,...
                             evalSequentialStruct_Satellite_hessApprox2,...
                             solStruct_CD_Satellite)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_Satellite_regularization,...
-                            [],...
-                            solStruct_CD_Satellite)
-        end
     end
-end
+end % end of for-loop for Satellite benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
@@ -690,14 +670,14 @@ degK = {1,1:2,1:2};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_Spacecraft_orbit = generateSpacecraft_orbit_probStruct(degV{kk},degH{kk},degK{kk});
+    probStruct_Spacecraft_orbit = generate_prob_struct_spacecraft_orbit_cbf_clf(degV{kk},degH{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('CBF-CLF Benchmark for %s Instance %d of %d. \n', probStruct_Spacecraft_orbit.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_Spacecraft_orbit(probStruct_Spacecraft_orbit);
+    x0 = generate_init_guess_spacecraft_orbit_cbf_clf(probStruct_Spacecraft_orbit);
 
     % solve Spacecraft_orbit example using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -706,6 +686,7 @@ for kk = 1:numel(degV)
                                                                         x0, ...
                                                                         hess_est_method);
 
+    % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_Spacecraft_orbit_regularization;
 
     % extract size and timing statistic from sequential and add some meta
@@ -713,7 +694,6 @@ for kk = 1:numel(degV)
     evalSequentialStruct_Spacecraft_orbit_regularization                 = evalSequential(solStruct_seq_Spacecraft_orbit_regularization);
     evalSequentialStruct_Spacecraft_orbit_regularization.hess_est_method = hess_est_method_1;
     evalSequentialStruct_Spacecraft_orbit_regularization.probNumber      = kk;
-    evalSequentialStruct_Spacecraft_orbit_hessApprox2 = [];
 
     % just some gap in display output
     fprintf('\n')
@@ -721,14 +701,15 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_Spacecraft_orbit_hessApprox2 = solve_CbfClf_seq_bench_fun(probStruct_Spacecraft_orbit, ...
                                                                          commonOpts, ...
                                                                          x0, ...
-                                                                         hess_est_method);
+                                                                         hess_est_method_2);
 
+        % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Spacecraft_orbit_hessApprox2;
 
         % just some gap in display output
@@ -741,13 +722,18 @@ for kk = 1:numel(degV)
         evalSequentialStruct_Spacecraft_orbit_hessApprox2                 = evalSequential(solStruct_seq_Spacecraft_orbit_hessApprox2);
         evalSequentialStruct_Spacecraft_orbit_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_Spacecraft_orbit_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_Spacecraft_orbit_hessApprox2 = [];
+        solStruct_seq_Spacecraft_orbit_hessApprox2        = [];
     end
 
     % solve Spacecraft_orbit example using custom coordinate-descent
-    solStruct_CD_Spacecraft_orbit = solve_CbfClf_CD_bench_fun(probStruct_Spacecraft_orbit,commonOpts,x0);
+    solStruct_CD_Spacecraft_orbit = solve_CbfClf_CD_bench_fun(probStruct_Spacecraft_orbit, ...
+                                                              commonOpts, ...
+                                                              x0);
 
     cdSolverStructs{end+1} = solStruct_CD_Spacecraft_orbit;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Spacecraft_orbit.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_Spacecraft_orbit.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -756,40 +742,22 @@ for kk = 1:numel(degV)
     fprintf('\n')
 
     % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_Spacecraft_orbit, ...
-                                    solStruct_CD_Spacecraft_orbit, ...
-                                    solStruct_seq_Spacecraft_orbit_regularization, ...
-                                    solStruct_seq_Spacecraft_orbit_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_Spacecraft_orbit, ...
-                                    solStruct_CD_Spacecraft_orbit, ...
-                                    solStruct_seq_Spacecraft_orbit_regularization, ...
-                                    [], ...
-                                    true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_Spacecraft_orbit, ...
+                                solStruct_CD_Spacecraft_orbit, ...
+                                solStruct_seq_Spacecraft_orbit_regularization, ...
+                                solStruct_seq_Spacecraft_orbit_hessApprox2, ...
+                                true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_Spacecraft_orbit_regularization,...
                             evalSequentialStruct_Spacecraft_orbit_hessApprox2,...
                             solStruct_CD_Spacecraft_orbit)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_Spacecraft_orbit_regularization,...
-                            [],...
-                            solStruct_CD_Spacecraft_orbit)
-        end
     end
-end
+end % end of for-loop for Spacecraft_orbit benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
