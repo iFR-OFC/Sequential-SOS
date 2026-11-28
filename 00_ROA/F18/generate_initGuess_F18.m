@@ -1,3 +1,18 @@
+% *****+*******************************************************************
+%
+%   Short Description:  Implements the initial guess for the F-A/18
+%                       dynamical system taken from [1].
+%
+%
+%   Reference: [1] Susceptibility of F/A-18 Flight Controllers to the 
+%                  Falling-Leaf Mode: Nonlinear Analysis Abhijit 
+%                  Chakraborty, Peter Seiler, and Gary J. Balas Journal of 
+%                  Guidance, Control, and Dynamics 2011 34:1, 73-85
+%
+%   License: GNU GENERAL PUBLIC LICENSE Version 3
+%
+% *****+*******************************************************************
+
 function x0 = generate_initGuess_F18(probStruct_F18)
 
 f = probStruct_F18.f;

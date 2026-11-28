@@ -1,7 +1,26 @@
 %% ***********************************************************************
 %
-%  Region-of-attraction Estimation Benchmark Test Runner
+%  Region-of-attraction (ROA) Estimation Benchmark Runner
 %
+%
+%   SOS Problem for ROA Estimation
+%
+%   min      ||g - (V-β)||
+%   V,s 
+%
+%   s.j.    s                        is SOS
+%           V  - ϵ(x)                is SOS
+%           s(V-β) - ∇Vf(x,u) - ϵ(x) is SOS
+%
+%   V    - Lyapunov function
+%   s    - SOS multiplier
+%   β    - Level set (fixed)
+%   ϵ(x) - Small term
+%   g    - Safe set/desired operating region
+%  
+%
+%  Overview
+%  
 %  Benchmark 1: Van-der-Pol Oscillator
 %  Benchmark 2: Multi-Input-Multi-Output
 %  Benchmark 3: Double Pendulum
@@ -10,18 +29,8 @@
 %  Benchmark 6: F-18
 %  Benchmark 7: Network
 %
-%  Note 1: Each runs uses various combinations of polynomial degrees. For SOS
-%  problem to be feasible or to improve solution quality higher degree are
-%  needed. Hence, with a higher degree more decision variables occur and
-%  the Gram matrices become larger. Therefore, we can check the behavior
-%  for over several benchmark problems, i.e., we have sub-benchmarks so to
-%  say that increase our benchmark set.
 %
-%  Note 2: The user might select a second hessian approximation method for
-%  sequential. This is optional, but interesting in terms of convergence
-%  speed.
-%
-%
+%  License: GNU GENERAL PUBLIC LICENSE Version 3
 %
 % ***********************************************************************
 set(groot, ...
@@ -64,25 +73,27 @@ end
 
 % enable plotting of convergence for each run
 enable_plot_convergence  = true;
-enable_second_sequential = true;
+
+% enable runs with second hessian estimation method
+enable_second_sequential = false;
 
 % Hessian estimation methods of the sequential solver to compare
-hess_est_method_1 = 'regularization_frobenius'; % our default (see also sequentialCommon.m)
-hess_est_method_2 = 'regularization_levenberg';      % 'damped_bfgs', 'regularization_levenberg', 'regularization_mirror', 'regularization_frobenius'
+hess_est_method_1 = 'regularization_frobenius'; % our default
+hess_est_method_2 = 'regularization_levenberg'; % 'damped_bfgs', 'regularization_levenberg', 'regularization_mirror', 'regularization_frobenius'
 
 % common options shared by the methods
-commonOpts.maxiter       = 500;
-commonOpts.tolerance_opt = 1e-4;
-commonOpts.eps_cost      = 1e-6;
+commonOpts.maxiter          = 500;
+commonOpts.tolerance_opt    = 1e-4;
+commonOpts.eps_cost         = 1e-6;
 commonOpts.small_prog_count = 10;
 commonOpts.maxSolveTime     = 3600;
 commonOpts.almost_opt_count = 10;
-commonOpts.solver           =  'mosek';
-commonOpts.miniter          = 5; % minimum iterations before an aborted CD run still counts as successful
+commonOpts.solver           = 'mosek'; % 'clarabel', 'scs'
+commonOpts.miniter          = 5; 
 
-% MOSEK settings
-
+% SDP solver settings
 if strcmpi(commonOpts.solver,'mosek')
+
     commonOpts.sdp_solver_opts.mosek_param = struct('MSK_IPAR_NUM_THREADS',1);
     commonOpts.sdp_solver_opts.mosek_echo = 0;
 
@@ -100,12 +111,12 @@ end
 
 % variable names of the results table (one row per run)
 tableVariableNames = {'Prob. No.','Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
-    'Build Time (CD)','Build Time (SQ)','Solve Time (CD)','Solve Time (SQ)', ...
-    'Iterations (CD)','Iterations (SQ)','time/iter. (CD)','time/iter. (SQ)','Final Cost (CD)','Final Cost (SQ)', ...
-    'Solved (CD)','Solved (SQ)'};
+                      'Build Time (CD)','Build Time (SQ)','Solve Time (CD)','Solve Time (SQ)', ...
+                      'Iterations (CD)','Iterations (SQ)','time/iter. (CD)','time/iter. (SQ)','Final Cost (CD)','Final Cost (SQ)', ...
+                      'Solved (CD)','Solved (SQ)'};
 
 % extend the results table by the sequential run with the second Hessian
-% estimation method (cf. enable_second_sequential)
+% (if selected)
 if enable_second_sequential
     tableVariableNames = [tableVariableNames, ...
         ['Build Time (SQ ' hess_est_method_2 ')'], ...
@@ -117,15 +128,14 @@ if enable_second_sequential
 end
 
 % initialize the cell array that accumulates one row per run of the
-% results table (one column per table variable)
+% results table
 tableRows = cell(0, numel(tableVariableNames));
-
 
 % initialize the cell arrays of stored runs (one entry per run)
 seqSolverStructs_regularization = {};
 seqSolverStructs_hessApprox2    = {};
 cdSolverStructs                 = {};
-probNames                       = {}; % problem name per run (for the evaluation output)
+probNames                       = {};
 
 
 total_benchmark_time_start = tic;
@@ -171,13 +181,13 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_VDP_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_VDP, ...
                                                                 commonOpts, ...
                                                                 x0, ...
-                                                                hess_est_method);
+                                                                hess_est_method_2);
         
         % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_VDP_hessApprox2;
@@ -192,10 +202,15 @@ for kk = 1:numel(degV)
         evalSequentialStruct_VDP_hessApprox2                 = evalSequential(solStruct_seq_VDP_hessApprox2);
         evalSequentialStruct_VDP_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_VDP_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_VDP_hessApprox2 = [];
+        solStruct_seq_VDP_hessApprox2        = [];
     end
 
-    % solve VDP example with two states using custom coordinate-descent
-    solStruct_CD_VDP = solve_ROA_CD_bench_fun(probStruct_VDP,commonOpts,x0);
+    % solve VDP example using custom coordinate-descent
+    solStruct_CD_VDP = solve_ROA_CD_bench_fun(probStruct_VDP, ...
+                                              commonOpts, ...
+                                              x0);
 
     cdSolverStructs{end+1} = solStruct_CD_VDP;
     probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_VDP.Name, kk, numel(degV),commonOpts.solver);
@@ -207,44 +222,26 @@ for kk = 1:numel(degV)
     fprintf('\n')
 
     % append the current run to the accumulating results table
-    if enable_second_sequential
         tableRows = appendResultRow(tableRows, ...
                                     probStruct_VDP, ...
                                     solStruct_CD_VDP, ...
                                     solStruct_seq_VDP_regularization, ...
                                     solStruct_seq_VDP_hessApprox2, ...
                                     true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_VDP, ...
-                                    solStruct_CD_VDP, ...
-                                    solStruct_seq_VDP_regularization, ...
-                                    [], ...
-                                    true);
-    end
-
+    
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_VDP_regularization,...
                             evalSequentialStruct_VDP_hessApprox2,...
                             solStruct_CD_VDP)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_VDP_regularization,...
-                            [],...
-                            solStruct_CD_VDP)
-        end
     end
-end
+
+end % end of for-loop for VDP benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
-
 
 
 
