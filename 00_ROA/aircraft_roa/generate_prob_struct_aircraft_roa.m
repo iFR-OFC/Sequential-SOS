@@ -1,11 +1,21 @@
+% *****+*******************************************************************
+%
+%   Short Description:  Implements the problem struct for the Aircraft
+%                       dynamical system.
+%
+%
+%   Reference:
+%
+%   License: GNU GENERAL PUBLIC LICENSE Version 3
+%
+% *****+*******************************************************************
 
-function [probStruct] = generateAircraft_probStruct(degV,degS)
+function [probStruct] = generate_prob_struct_aircraft_roa(degV,degS)
 
 x = casos.Indeterminates('x',4);
 
 % Polynomial Dynamics
 f = GTM_dynamics(x(1),x(2),x(3),x(4));
-
 
 G0 = [3.95382671347060	-0.230032507976836	 0.0316965275615692	 0.292992065909380
     -0.230032507976836	 0.904764915483640	-0.161191428789579	-1.32594376986430
@@ -20,7 +30,6 @@ V = casos.PS.sym('v',monomials(x,degV));
 % SOS multiplier
 s1 = casos.PS.sym('s1',monomials(x,degS));
 
-
 % fill structure
 probStruct.x    = x;        % indeterminates
 probStruct.f    = f;        % dynamics
@@ -31,5 +40,3 @@ probStruct.b    = 2;        % constant stable level set
 probStruct.Name = 'Aircraft'; % Name of example
 
 end
-
- 

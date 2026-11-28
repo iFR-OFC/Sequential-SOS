@@ -21,13 +21,14 @@
 %
 %  Overview
 %  
-%  Benchmark 1: Van-der-Pol Oscillator
+%  Benchmark 1: VDP
 %  Benchmark 2: Multi-Input-Multi-Output
-%  Benchmark 3: Double Pendulum
-%  Benchmark 4: Aircraft
-%  Benchmark 5: Satellite
-%  Benchmark 6: F-18
-%  Benchmark 7: Network
+%  Benchmark 3: VDP_coupled
+%  Benchmark 4: Double Pendulum
+%  Benchmark 5: Aircraft 4D
+%  Benchmark 6: Satellite
+%  Benchmark 7: F/A-18
+%  Benchmark 8: 12-State Dynamical System
 %
 %
 %  License: GNU GENERAL PUBLIC LICENSE Version 3
@@ -57,14 +58,14 @@ casadiVersion = casadi.CasadiMeta.version;
 % add the problem specific folders and the shared helper functions
 runnerDir = pwd;
 addPaths  = { ...
-    fullfile(runnerDir,'VDP'), ...
-    fullfile(runnerDir,'VDP_coupled'), ...
-    fullfile(runnerDir,'MultiInput'), ...
-    fullfile(runnerDir,'DoublePendulum'), ...
-    fullfile(runnerDir,'Aircraft'), ...
-    fullfile(runnerDir,'Satellite_Att'), ...
-    fullfile(runnerDir,'F18'), ...
-    fullfile(runnerDir,'Network'), ...
+    fullfile(runnerDir,'vdp_roa'), ...
+    fullfile(runnerDir,'vdp_coupled_roa'), ...
+    fullfile(runnerDir,'mimo_roa'), ...
+    fullfile(runnerDir,'double_pendulum_roa'), ...
+    fullfile(runnerDir,'aircraft_roa'), ...
+    fullfile(runnerDir,'spacecraft_att_roa'), ...
+    fullfile(runnerDir,'f18_roa'), ...
+    fullfile(runnerDir,'network_roa'), ...
     fullfile(runnerDir,'..','helperFunctions')};
 
 for ii = 1:numel(addPaths)
@@ -75,7 +76,7 @@ end
 enable_plot_convergence  = true;
 
 % enable runs with second hessian estimation method
-enable_second_sequential = false;
+enable_second_sequential = true;
 
 % Hessian estimation methods of the sequential solver to compare
 hess_est_method_1 = 'regularization_frobenius'; % our default
@@ -150,14 +151,14 @@ degS = {2,2,2:4,2:4};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_VDP = generateVDP_probStruct(degV{kk},degS{kk});
+    probStruct_VDP = generate_prob_struct_vdp_roa(degV{kk},degS{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_VDP.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_VDP(probStruct_VDP);
+    x0 = generate_init_guess_vdp_roa(probStruct_VDP);
 
     % solve VDP example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -165,7 +166,7 @@ for kk = 1:numel(degV)
                                                                commonOpts, ...
                                                                x0, ...
                                                                hess_est_method);
-    
+
     % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_VDP_regularization;
 
@@ -188,7 +189,7 @@ for kk = 1:numel(degV)
                                                                 commonOpts, ...
                                                                 x0, ...
                                                                 hess_est_method_2);
-        
+
         % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_VDP_hessApprox2;
 
@@ -213,7 +214,7 @@ for kk = 1:numel(degV)
                                               x0);
 
     cdSolverStructs{end+1} = solStruct_CD_VDP;
-    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_VDP.Name, kk, numel(degV),commonOpts.solver);
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_VDP.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -222,13 +223,13 @@ for kk = 1:numel(degV)
     fprintf('\n')
 
     % append the current run to the accumulating results table
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_VDP, ...
-                                    solStruct_CD_VDP, ...
-                                    solStruct_seq_VDP_regularization, ...
-                                    solStruct_seq_VDP_hessApprox2, ...
-                                    true);
-    
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_VDP, ...
+                                solStruct_CD_VDP, ...
+                                solStruct_seq_VDP_regularization, ...
+                                solStruct_seq_VDP_hessApprox2, ...
+                                true);
+
     % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
             plotConvergence(probNames{end}, ...
@@ -255,14 +256,14 @@ degS = {2,   2, 2:4, 2:4};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_MiMo = generateMiMo_probStruct(degV{kk},degS{kk});
+    probStruct_MiMo = generate_prob_struct_mimo_roa(degV{kk},degS{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_MiMo.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_MiMo(probStruct_MiMo);
+    x0 = generate_init_guess_mimo_roa(probStruct_MiMo);
 
     % solve MiMo example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -271,9 +272,11 @@ for kk = 1:numel(degV)
                                                                 x0, ...
                                                                 hess_est_method);
 
+    % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_MiMo_regularization;
 
-    % extract size and timing statistic from sequential
+    % extract size and timing statistic from sequential and add some meta
+    % data for plotting
     evalSequentialStruct_MiMo_regularization                 = evalSequential(solStruct_seq_MiMo_regularization);
     evalSequentialStruct_MiMo_regularization.hess_est_method = hess_est_method_1;
     evalSequentialStruct_MiMo_regularization.probNumber      = kk;
@@ -284,14 +287,15 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_MiMo_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_MiMo, ...
                                                                  commonOpts, ...
                                                                  x0, ...
-                                                                 hess_est_method);
+                                                                 hess_est_method_2);
 
+        % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_MiMo_hessApprox2;
 
         % just some gap in display output
@@ -304,13 +308,18 @@ for kk = 1:numel(degV)
         evalSequentialStruct_MiMo_hessApprox2                 = evalSequential(solStruct_seq_MiMo_hessApprox2);
         evalSequentialStruct_MiMo_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_MiMo_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_MiMo_hessApprox2 = [];
+        solStruct_seq_MiMo_hessApprox2        = [];
     end
 
     % solve MiMo example with two states using custom coordinate-descent
-    solStruct_CD_MiMo = solve_ROA_CD_bench_fun(probStruct_MiMo,commonOpts,x0);
+    solStruct_CD_MiMo = solve_ROA_CD_bench_fun(probStruct_MiMo, ...
+                                              commonOpts, ...
+                                              x0);
 
     cdSolverStructs{end+1} = solStruct_CD_MiMo;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_MiMo.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_MiMo.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -318,43 +327,24 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
-    % Generate table
-
     % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_MiMo, ...
-                                    solStruct_CD_MiMo, ...
-                                    solStruct_seq_MiMo_regularization, ...
-                                    solStruct_seq_MiMo_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_MiMo, ...
-                                    solStruct_CD_MiMo, ...
-                                    solStruct_seq_MiMo_regularization, ...
-                                    [], ...
-                                    true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_MiMo, ...
+                                solStruct_CD_MiMo, ...
+                                solStruct_seq_MiMo_regularization, ...
+                                solStruct_seq_MiMo_hessApprox2, ...
+                                true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_MiMo_regularization,...
                             evalSequentialStruct_MiMo_hessApprox2,...
                             solStruct_CD_MiMo)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_MiMo_regularization,...
-                            [],...
-                            solStruct_CD_MiMo)
-        end
     end
-end
+
+end % end of for-loop for Multi-Input-Multi-Output benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
@@ -372,14 +362,14 @@ degS = {2,2,2:4,2:4};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_VDP_coupled = generateVDP_coupled_probStruct(degV{kk},degS{kk});
+    probStruct_VDP_coupled = generate_prob_struct_vdp_coupled_roa(degV{kk},degS{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_VDP_coupled.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_VDP_coupled(probStruct_VDP_coupled);
+    x0 = generate_init_guess_vdp_coupled_roa(probStruct_VDP_coupled);
 
     % solve VDP_coupled example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -387,7 +377,7 @@ for kk = 1:numel(degV)
                                                                commonOpts, ...
                                                                x0, ...
                                                                hess_est_method);
-    
+
     % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_VDP_coupled_regularization;
 
@@ -403,14 +393,14 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_VDP_coupled_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_VDP_coupled, ...
                                                                 commonOpts, ...
                                                                 x0, ...
-                                                                hess_est_method);
-        
+                                                                hess_est_method_2);
+
         % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_VDP_coupled_hessApprox2;
 
@@ -424,13 +414,18 @@ for kk = 1:numel(degV)
         evalSequentialStruct_VDP_coupled_hessApprox2                 = evalSequential(solStruct_seq_VDP_coupled_hessApprox2);
         evalSequentialStruct_VDP_coupled_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_VDP_coupled_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_VDP_coupled_hessApprox2 = [];
+        solStruct_seq_VDP_coupled_hessApprox2        = [];
     end
 
     % solve VDP_coupled example with two states using custom coordinate-descent
-    solStruct_CD_VDP_coupled = solve_ROA_CD_bench_fun(probStruct_VDP_coupled,commonOpts,x0);
+    solStruct_CD_VDP_coupled = solve_ROA_CD_bench_fun(probStruct_VDP_coupled, ...
+                                                     commonOpts, ...
+                                                     x0);
 
     cdSolverStructs{end+1} = solStruct_CD_VDP_coupled;
-    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_VDP_coupled.Name, kk, numel(degV),commonOpts.solver);
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_VDP_coupled.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -439,40 +434,23 @@ for kk = 1:numel(degV)
     fprintf('\n')
 
     % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_VDP_coupled, ...
-                                    solStruct_CD_VDP_coupled, ...
-                                    solStruct_seq_VDP_coupled_regularization, ...
-                                    solStruct_seq_VDP_coupled_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_VDP_coupled, ...
-                                    solStruct_CD_VDP_coupled, ...
-                                    solStruct_seq_VDP_coupled_regularization, ...
-                                    [], ...
-                                    true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_VDP_coupled, ...
+                                solStruct_CD_VDP_coupled, ...
+                                solStruct_seq_VDP_coupled_regularization, ...
+                                solStruct_seq_VDP_coupled_hessApprox2, ...
+                                true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_VDP_coupled_regularization,...
                             evalSequentialStruct_VDP_coupled_hessApprox2,...
                             solStruct_CD_VDP_coupled)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_VDP_coupled_regularization,...
-                            [],...
-                            solStruct_CD_VDP_coupled)
-        end
     end
-end
+
+end % end of for-loop for VDP_coupled benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
@@ -488,14 +466,14 @@ degS = {2;2;2:4};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_DoublePendulum = generateDoublePendulum_probStruct(degV{kk},degS{kk});
+    probStruct_DoublePendulum = generate_prob_struct_double_pendulum_roa(degV{kk},degS{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_DoublePendulum.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_DoublePendulum(probStruct_DoublePendulum);
+    x0 = generate_init_guess_double_pendulum_roa(probStruct_DoublePendulum);
 
     % solve DoublePendulum example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -504,9 +482,11 @@ for kk = 1:numel(degV)
                                                                           x0, ...
                                                                           hess_est_method);
 
+    % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_DoublePendulum_regularization;
 
-    % extract size and timing statistic from sequential
+    % extract size and timing statistic from sequential and add some meta
+    % data for plotting
     evalSequentialStruct_DoublePendulum_regularization                 = evalSequential(solStruct_seq_DoublePendulum_regularization);
     evalSequentialStruct_DoublePendulum_regularization.hess_est_method = hess_est_method_1;
     evalSequentialStruct_DoublePendulum_regularization.probNumber      = kk;
@@ -517,14 +497,15 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_DoublePendulum_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_DoublePendulum, ...
                                                                            commonOpts, ...
                                                                            x0, ...
-                                                                           hess_est_method);
+                                                                           hess_est_method_2);
 
+        % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_DoublePendulum_hessApprox2;
 
         % just some gap in display output
@@ -537,13 +518,18 @@ for kk = 1:numel(degV)
         evalSequentialStruct_DoublePendulum_hessApprox2                 = evalSequential(solStruct_seq_DoublePendulum_hessApprox2);
         evalSequentialStruct_DoublePendulum_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_DoublePendulum_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_DoublePendulum_hessApprox2 = [];
+        solStruct_seq_DoublePendulum_hessApprox2        = [];
     end
 
     % solve DoublePendulum example with two states using custom coordinate-descent
-    solStruct_CD_DoublePendulum = solve_ROA_CD_bench_fun(probStruct_DoublePendulum,commonOpts,x0);
+    solStruct_CD_DoublePendulum = solve_ROA_CD_bench_fun(probStruct_DoublePendulum, ...
+                                                        commonOpts, ...
+                                                        x0);
 
     cdSolverStructs{end+1} = solStruct_CD_DoublePendulum;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_DoublePendulum.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_DoublePendulum.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -551,43 +537,24 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
-    % Generate table
-
     % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_DoublePendulum, ...
-                                    solStruct_CD_DoublePendulum, ...
-                                    solStruct_seq_DoublePendulum_regularization, ...
-                                    solStruct_seq_DoublePendulum_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_DoublePendulum, ...
-                                    solStruct_CD_DoublePendulum, ...
-                                    solStruct_seq_DoublePendulum_regularization, ...
-                                    [], ...
-                                    true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_DoublePendulum, ...
+                                solStruct_CD_DoublePendulum, ...
+                                solStruct_seq_DoublePendulum_regularization, ...
+                                solStruct_seq_DoublePendulum_hessApprox2, ...
+                                true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_DoublePendulum_regularization,...
                             evalSequentialStruct_DoublePendulum_hessApprox2,...
                             solStruct_CD_DoublePendulum)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_DoublePendulum_regularization,...
-                            [],...
-                            solStruct_CD_DoublePendulum)
-        end
     end
-end
+
+end % end of for-loop for Double Pendulum benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
@@ -603,14 +570,14 @@ degS = {2, 2:4, 2:4, 2:4};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_Aircraft = generateAircraft_probStruct(degV{kk},degS{kk});
+    probStruct_Aircraft = generate_prob_struct_aircraft_roa(degV{kk},degS{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_Aircraft.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_Aircraft(probStruct_Aircraft);
+    x0 = generate_init_guess_aircraft_roa(probStruct_Aircraft);
 
     % solve Aircraft example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -619,9 +586,11 @@ for kk = 1:numel(degV)
                                                                     x0, ...
                                                                     hess_est_method);
 
+    % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_Aircraft_regularization;
 
-    % extract size and timing statistic from sequential
+    % extract size and timing statistic from sequential and add some meta
+    % data for plotting
     evalSequentialStruct_Aircraft_regularization                 = evalSequential(solStruct_seq_Aircraft_regularization);
     evalSequentialStruct_Aircraft_regularization.hess_est_method = hess_est_method_1;
     evalSequentialStruct_Aircraft_regularization.probNumber      = kk;
@@ -632,14 +601,15 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_Aircraft_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_Aircraft, ...
                                                                      commonOpts, ...
                                                                      x0, ...
-                                                                     hess_est_method);
+                                                                     hess_est_method_2);
 
+        % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Aircraft_hessApprox2;
 
         % just some gap in display output
@@ -652,13 +622,18 @@ for kk = 1:numel(degV)
         evalSequentialStruct_Aircraft_hessApprox2                 = evalSequential(solStruct_seq_Aircraft_hessApprox2);
         evalSequentialStruct_Aircraft_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_Aircraft_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_Aircraft_hessApprox2 = [];
+        solStruct_seq_Aircraft_hessApprox2        = [];
     end
 
     % solve Aircraft example with two states using custom coordinate-descent
-    solStruct_CD_Aircraft = solve_ROA_CD_bench_fun(probStruct_Aircraft,commonOpts,x0);
+    solStruct_CD_Aircraft = solve_ROA_CD_bench_fun(probStruct_Aircraft, ...
+                                                  commonOpts, ...
+                                                  x0);
 
     cdSolverStructs{end+1} = solStruct_CD_Aircraft;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_Aircraft.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_Aircraft.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -666,43 +641,24 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
-    % Generate table
-
     % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_Aircraft, ...
-                                    solStruct_CD_Aircraft, ...
-                                    solStruct_seq_Aircraft_regularization, ...
-                                    solStruct_seq_Aircraft_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_Aircraft, ...
-                                    solStruct_CD_Aircraft, ...
-                                    solStruct_seq_Aircraft_regularization, ...
-                                    [], ...
-                                    true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_Aircraft, ...
+                                solStruct_CD_Aircraft, ...
+                                solStruct_seq_Aircraft_regularization, ...
+                                solStruct_seq_Aircraft_hessApprox2, ...
+                                true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_Aircraft_regularization,...
                             evalSequentialStruct_Aircraft_hessApprox2,...
                             solStruct_CD_Aircraft)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_Aircraft_regularization,...
-                            [],...
-                            solStruct_CD_Aircraft)
-        end
     end
-end
+
+end % end of for-loop for Aircraft 4D benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
@@ -719,14 +675,14 @@ degS = {2,   2, 2:4, 2:4};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_Satellite = generateSatellite_probStruct(degV{kk},degS{kk});
+    probStruct_Satellite = generate_prob_struct_spacecraft_att_roa(degV{kk},degS{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_Satellite.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_Satellite(probStruct_Satellite);
+    x0 = generate_init_guess_spacecraft_att_roa(probStruct_Satellite);
 
     % solve Satellite example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -735,6 +691,7 @@ for kk = 1:numel(degV)
                                                                      x0, ...
                                                                      hess_est_method);
 
+    % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_Satellite_regularization;
 
     % extract size and timing statistic from sequential and add some meta
@@ -749,14 +706,15 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_Satellite_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_Satellite, ...
                                                                       commonOpts, ...
                                                                       x0, ...
-                                                                      hess_est_method);
+                                                                      hess_est_method_2);
 
+        % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Satellite_hessApprox2;
 
         % just some gap in display output
@@ -769,13 +727,18 @@ for kk = 1:numel(degV)
         evalSequentialStruct_Satellite_hessApprox2                 = evalSequential(solStruct_seq_Satellite_hessApprox2);
         evalSequentialStruct_Satellite_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_Satellite_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_Satellite_hessApprox2 = [];
+        solStruct_seq_Satellite_hessApprox2        = [];
     end
 
     % solve Satellite example with two states using custom coordinate-descent
-    solStruct_CD_Satellite = solve_ROA_CD_bench_fun(probStruct_Satellite,commonOpts,x0);
+    solStruct_CD_Satellite = solve_ROA_CD_bench_fun(probStruct_Satellite, ...
+                                                   commonOpts, ...
+                                                   x0);
 
     cdSolverStructs{end+1} = solStruct_CD_Satellite;
-    probNames{end+1}       = sprintf('%s (instance %d of %d with )', probStruct_Satellite.Name, kk, numel(degV), commonOpts.solver);
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_Satellite.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -784,40 +747,23 @@ for kk = 1:numel(degV)
     fprintf('\n')
 
     % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_Satellite, ...
-                                    solStruct_CD_Satellite, ...
-                                    solStruct_seq_Satellite_regularization, ...
-                                    solStruct_seq_Satellite_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_Satellite, ...
-                                    solStruct_CD_Satellite, ...
-                                    solStruct_seq_Satellite_regularization, ...
-                                    [], ...
-                                    true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_Satellite, ...
+                                solStruct_CD_Satellite, ...
+                                solStruct_seq_Satellite_regularization, ...
+                                solStruct_seq_Satellite_hessApprox2, ...
+                                true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_Satellite_regularization,...
                             evalSequentialStruct_Satellite_hessApprox2,...
                             solStruct_CD_Satellite)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_Satellite_regularization,...
-                            [],...
-                            solStruct_CD_Satellite)
-        end
     end
-end
+
+end % end of for-loop for Satellite benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
@@ -834,14 +780,14 @@ degS = {2,   2, 2};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_F18 = generateF18_probStruct(degV{kk},degS{kk});
+    probStruct_F18 = generate_prob_struct_f18_roa(degV{kk},degS{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_F18.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_F18(probStruct_F18);
+    x0 = generate_init_guess_f18_roa(probStruct_F18);
 
     % solve F-18 example with seven states using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -850,10 +796,11 @@ for kk = 1:numel(degV)
                                                               x0, ...
                                                               hess_est_method);
 
-    % store in a common struct for all sequential instances and problem
+    % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_7D_regularization;
 
-    % extract size and timing statistic from sequential
+    % extract size and timing statistic from sequential and add some meta
+    % data for plotting
     evalSequentialStruct_7D_regularization                 = evalSequential(solStruct_seq_7D_regularization);
     evalSequentialStruct_7D_regularization.hess_est_method = hess_est_method_1;
     evalSequentialStruct_7D_regularization.probNumber      = kk;
@@ -864,14 +811,15 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
+    % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        hess_est_method = hess_est_method_2;
         solStruct_seq_7D_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_F18, ...
                                                                commonOpts, ...
                                                                x0, ...
-                                                               hess_est_method);
+                                                               hess_est_method_2);
 
+        % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_7D_hessApprox2;
 
         % just some gap in display output
@@ -884,13 +832,18 @@ for kk = 1:numel(degV)
         evalSequentialStruct_7D_hessApprox2                 = evalSequential(solStruct_seq_7D_hessApprox2);
         evalSequentialStruct_7D_hessApprox2.hess_est_method = hess_est_method_2;
         evalSequentialStruct_7D_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_7D_hessApprox2 = [];
+        solStruct_seq_7D_hessApprox2        = [];
     end
 
     % solve F-18 example with seven states using custom coordinate-descent
-    solStruct_CD_7D = solve_ROA_CD_bench_fun(probStruct_F18,commonOpts,x0);
+    solStruct_CD_7D = solve_ROA_CD_bench_fun(probStruct_F18, ...
+                                             commonOpts, ...
+                                             x0);
 
     cdSolverStructs{end+1} = solStruct_CD_7D;
-    probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_F18.Name, kk, numel(degV));
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_F18.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -898,43 +851,24 @@ for kk = 1:numel(degV)
     fprintf('\n')
     fprintf('\n')
 
-    % Generate table
-
     % append the current run to the accumulating results table
-    if enable_second_sequential
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_F18, ...
-                                    solStruct_CD_7D, ...
-                                    solStruct_seq_7D_regularization, ...
-                                    solStruct_seq_7D_hessApprox2, ...
-                                    true);
-    else
-        tableRows = appendResultRow(tableRows, ...
-                                    probStruct_F18, ...
-                                    solStruct_CD_7D, ...
-                                    solStruct_seq_7D_regularization, ...
-                                    [], ...
-                                    true);
-    end
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_F18, ...
+                                solStruct_CD_7D, ...
+                                solStruct_seq_7D_regularization, ...
+                                solStruct_seq_7D_hessApprox2, ...
+                                true);
 
+    % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
-        if enable_second_sequential
-            % Evaluate
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
                             evalSequentialStruct_7D_regularization,...
                             evalSequentialStruct_7D_hessApprox2,...
                             solStruct_CD_7D)
-        else
-            % Evaluate
-            plotConvergence(probNames{end}, ...
-                            enable_second_sequential,...
-                            evalSequentialStruct_7D_regularization,...
-                            [],...
-                            solStruct_CD_7D)
-        end
     end
-end
+
+end % end of for-loop for F/A-18 benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
@@ -942,13 +876,13 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 %% 12-State Dynamical System
 
 % generate problem structure (dynamics, polynomial dec. variables)
-probStruct_12State= generate12State_probStruct();
+probStruct_12State = generate_prob_struct_12state_roa();
 fprintf('------------------------------------------------------------------------------------------ \n')
 fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_12State.Name, 1, 1)
 fprintf('------------------------------------------------------------------------------------------\n')
 
 % generate an initial guess
-x0 = generate_initGuess_12State(probStruct_12State);
+x0 = generate_init_guess_12state_roa(probStruct_12State);
 
 % solve 12 state dynamical system example with 12 states using sequential SOS
 hess_est_method = hess_est_method_1;
@@ -957,9 +891,11 @@ solStruct_seq_12D_regularization = solve_ROA_seq_bench_fun(probStruct_12State, .
                                                            x0, ...
                                                            hess_est_method);
 
+% store in struct
 seqSolverStructs_regularization{end+1} = solStruct_seq_12D_regularization;
 
-% extract size and timing statistic from sequential
+% extract size and timing statistic from sequential and add some meta
+% data for plotting
 evalSequentialStruct_12D_regularization                 = evalSequential(solStruct_seq_12D_regularization);
 evalSequentialStruct_12D_regularization.hess_est_method = hess_est_method_1;
 evalSequentialStruct_12D_regularization.probNumber      = 1;
@@ -970,14 +906,15 @@ fprintf('\n')
 fprintf('\n')
 fprintf('\n')
 
+% if enabled compute with second hessian estimation method
 if enable_second_sequential
 
-    hess_est_method = hess_est_method_2;
     solStruct_seq_12D_hessApprox2 = solve_ROA_seq_bench_fun(probStruct_12State, ...
                                                             commonOpts, ...
                                                             x0, ...
-                                                            hess_est_method);
+                                                            hess_est_method_2);
 
+    % store in struct
     seqSolverStructs_hessApprox2{end+1} = solStruct_seq_12D_hessApprox2;
 
     % just some gap in display output
@@ -990,13 +927,18 @@ if enable_second_sequential
     evalSequentialStruct_12D_hessApprox2                 = evalSequential(solStruct_seq_12D_hessApprox2);
     evalSequentialStruct_12D_hessApprox2.hess_est_method = hess_est_method_2;
     evalSequentialStruct_12D_hessApprox2.probNumber      = 1;
+else
+    evalSequentialStruct_12D_hessApprox2 = [];
+    solStruct_seq_12D_hessApprox2        = [];
 end
 
 % solve 12 state dynamical system example with 12 states using custom coordinate-descent
-solStruct_CD_12D = solve_ROA_CD_bench_fun(probStruct_12State,commonOpts,x0);
+solStruct_CD_12D = solve_ROA_CD_bench_fun(probStruct_12State, ...
+                                         commonOpts, ...
+                                         x0);
 
 cdSolverStructs{end+1} = solStruct_CD_12D;
-probNames{end+1}       = sprintf('%s (instance %d of %d)', probStruct_12State.Name, 1, 1);
+probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_12State.Name, 1, 1, commonOpts.solver);
 
 % just some gap in display output
 fprintf('\n')
@@ -1004,41 +946,21 @@ fprintf('\n')
 fprintf('\n')
 fprintf('\n')
 
-% Generate table
-
 % append the current run to the accumulating results table
-if enable_second_sequential
-    tableRows = appendResultRow(tableRows, ...
-                                probStruct_12State, ...
-                                solStruct_CD_12D, ...
-                                solStruct_seq_12D_regularization, ...
-                                solStruct_seq_12D_hessApprox2, ...
-                                true);
-else
-    tableRows = appendResultRow(tableRows, ...
-                                probStruct_12State, ...
-                                solStruct_CD_12D, ...
-                                solStruct_seq_12D_regularization, ...
-                                [], ...
-                                true);
-end
+tableRows = appendResultRow(tableRows, ...
+                            probStruct_12State, ...
+                            solStruct_CD_12D, ...
+                            solStruct_seq_12D_regularization, ...
+                            solStruct_seq_12D_hessApprox2, ...
+                            true);
 
+% plot the scaled first order KKT condition over iterations
 if enable_plot_convergence
-    if enable_second_sequential
-        % Evaluate
         plotConvergence(probNames{end}, ...
                         enable_second_sequential,...
                         evalSequentialStruct_12D_regularization,...
                         evalSequentialStruct_12D_hessApprox2,...
                         solStruct_CD_12D)
-    else
-        % Evaluate
-        plotConvergence(probNames{end}, ...
-                        enable_second_sequential,...
-                        evalSequentialStruct_12D_regularization,...
-                        [],...
-                        solStruct_CD_12D)
-    end
 end
 
 % display the results table accumulated over all runs so far

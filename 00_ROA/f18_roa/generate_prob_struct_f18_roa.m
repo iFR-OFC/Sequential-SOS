@@ -13,7 +13,7 @@
 %
 % *****+*******************************************************************
 
-function [probStruct] = generateF18_probStruct(degV,degS)
+function [probStruct] = generate_prob_struct_f18_roa(degV,degS)
 
 x = casos.Indeterminates('x',7,1);
 

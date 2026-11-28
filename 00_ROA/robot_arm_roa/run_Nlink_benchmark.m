@@ -128,14 +128,14 @@ for kk = 1:(Nmax-Nmin+1)
     n = Nmin + kk - 1;
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_Nlink = generateNlink_probStruct(n,deg);
+    probStruct_Nlink = generate_prob_struct_nlink_roa(n,deg);
 
     fprintf('------------------------------------------------------------------------------------------ \n')
     fprintf('Region-of-Attraction Estimation Benchmark for %s Instance %d of %d. \n', probStruct_Nlink.Name, kk, Nmax-Nmin+1)
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_initGuess_Nlink(probStruct_Nlink);
+    x0 = generate_init_guess_nlink_roa(probStruct_Nlink);
 
     % solve Nlink example using sequential SOS
     hess_est_method = hess_est_method_1;
@@ -179,7 +179,7 @@ for kk = 1:(Nmax-Nmin+1)
 
     if enable_seq_badInit
         % solve Nlink example with a clearly infeasible initial guess
-        x0_bad = generate_initGuess_Nlink_badInit(probStruct_Nlink);
+        x0_bad = generate_init_guess_nlink_bad_init_roa(probStruct_Nlink);
         solStruct_seq_Nlink_badInit = solve_ROA_Nlink_seq_bench_fun(probStruct_Nlink,commonOpts,x0_bad,hess_est_method_1);
 
         % just some gap in display output

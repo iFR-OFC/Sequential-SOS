@@ -1,18 +1,16 @@
-%--------------------------------------------------------------------------
+% *****+*******************************************************************
 %
-%   Short Description:  Generate the problem structure (dynamics, safe
-%                       set, polynomial decision variables) for the ROA
-%                       estimation of the N-link robot arm with 2*N states.
+%   Short Description:  Implements the problem struct for the N-link
+%                       robot arm dynamical system.
 %
-%   Reference:  T. Cunis and J. Olucak,
-%   "CaΣoS: A nonlinear sum-of-squares optimization suite⋆,"
-%    2025 American Control Conference (ACC), Denver, CO,
-%    USA, 2025, pp. 1659-1666, doi: 10.23919/ACC63710.2025.11107794.
+%
+%   Reference:
 %
 %   License: GNU GENERAL PUBLIC LICENSE Version 3
-%--------------------------------------------------------------------------
+%
+% *****+*******************************************************************
 
-function [probStruct] = generateNlink_probStruct(n,deg)
+function [probStruct] = generate_prob_struct_nlink_roa(n,deg)
 
 % degree of the Taylor expansion of the dynamics and of the polynomial
 % decision variables (cf. robot/nLinkRobot_dyn_poly_n*_d*.m)

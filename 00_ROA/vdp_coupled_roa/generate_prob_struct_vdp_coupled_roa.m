@@ -1,5 +1,16 @@
+% *****+*******************************************************************
+%
+%   Short Description:  Implements the problem struct for the VDP-coupled
+%                       dynamical system.
+%
+%
+%   Reference:
+%
+%   License: GNU GENERAL PUBLIC LICENSE Version 3
+%
+% *****+*******************************************************************
 
-function [probStruct] = generateVDP_coupled_probStruct(degV,degS)
+function [probStruct] = generate_prob_struct_vdp_coupled_roa(degV,degS)
 
 x = casos.Indeterminates('x',4,1);
 u = casos.Indeterminates('u',2,1);
@@ -14,14 +25,13 @@ f = [-y1;
     -y2;
     y2*(1 - x2^2) - x2 + x1 - x2+ u(2)];
 
-
 A0 = full(subs(nabla(f,x),[x;u],zeros(length(x)+length(u),1)));
 B0 = full(subs(nabla(f,u),[x;u],zeros(length(x)+length(u),1)));
 
 K = lqr(A0,B0,eye(4),eye(2));
 
-
 f = subs(f,u,-K*x);
+
 % generate a desired safe set
 Q = eye(4);
 g = x'*Q*x-1;
@@ -31,7 +41,6 @@ V = casos.PS.sym('v',monomials(x,degV));
 
 % SOS multiplier
 s1    = casos.PS.sym('s1',monomials(x,degS));
-
 
 % fill structure
 probStruct.x    = x;        % indeterminates
@@ -43,5 +52,3 @@ probStruct.b    = 1;        % constant stable level set
 probStruct.Name = 'VDP-coupled'; % Name of example
 
 end
-
- 

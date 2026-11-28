@@ -13,7 +13,7 @@
 %
 % *****+*******************************************************************
 
-function x0 = generate_initGuess_F18(probStruct_F18)
+function x0 = generate_init_guess_f18_roa(probStruct_F18)
 
 f = probStruct_F18.f;
 x = probStruct_F18.x;
