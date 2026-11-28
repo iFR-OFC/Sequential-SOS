@@ -1,33 +1,19 @@
 % *****+*******************************************************************
 %
-%   Short Description:  Implements the problem struct for the Satellite
-%                       dynamical system.
+%   Short Description:  Implements the problem struct for CBF-CLF problem
+%                       using a Satellite dynamical system from [1].
 %
 %
-%   Reference:
+%   Reference: [1]	J. L. Junkins und H. Schaub, Analytical Mechanics of
+%                   Space Systems, Second Edition. Reston, VA: American
+%                   Institute of Aeronautics and Astronautics, 2009. doi:
+%                   10.2514/4.867231.
 %
 %   License: GNU GENERAL PUBLIC LICENSE Version 3
 %
 % *****+*******************************************************************
 
 function [probStruct] = generate_prob_struct_satellite_cbf_clf(degV,degH,degK)
-
-% Short Description: Problem description of the satellite (Hubble telescope)
-%                    attitude dynamics for the CBF-CLF synthesis. Calculates
-%                    a compatible pair of a CBF-CLF using sequential SOS.
-%                    This example is taken from [1] and [2].
-%
-% Reference:
-%   [1] Olucak, Jan and Castello Branco de Oliveira, Arthur and
-%   Cunis, Torbjørn - Safe-by-Design: Approximate Nonlinear Model
-%   Predictive Control with Real Time Feasibility, submitted to IEEE
-%   Transaction on Automatic Control, pre-print:
-%   https://arxiv.org/abs/2509.22422
-%
-%   [2] Olucak, Jan and Castello Branco de Oliveira, Arthur and
-%   Cunis, Torbjørn - Supplementary Material for: Safe-by-Design
-%   Approximate Nonlinear Model Predictive Control with Realtime
-%   Feasibility, doi = {10.18419/DARUS-5297}
 
 % system states
 x = casos.PS('x',6,1);

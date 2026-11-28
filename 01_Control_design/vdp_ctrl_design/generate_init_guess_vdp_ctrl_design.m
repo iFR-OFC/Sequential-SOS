@@ -1,10 +1,13 @@
 % *****+*******************************************************************
 %
-%   Short Description:  Implements the initial guess for the VDP
-%                       dynamical system.
+%   Short Description:  Implements the initial guess for control design
+%                       problem using a VDP dynamical system from [1].
 %
 %
-%   Reference:
+%   Reference: [1]	T. Cunis und I. Kolmanovsky, „Viability, viscosity, and
+%                   storage functions in model-predictive control with
+%                   terminal constraints", Automatica, Bd. 131, S. 109748,
+%                   Sep. 2021, doi: 10.1016/j.automatica.2021.109748.
 %
 %   License: GNU GENERAL PUBLIC LICENSE Version 3
 %

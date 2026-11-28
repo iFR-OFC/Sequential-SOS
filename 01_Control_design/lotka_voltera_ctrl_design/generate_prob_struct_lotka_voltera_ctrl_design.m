@@ -1,10 +1,14 @@
 % *****+*******************************************************************
 %
-%   Short Description:  Implements the problem struct for the Lotka-Voltera
-%                       dynamical system.
+%   Short Description:  Implements the problem struct for control design
+%                       problem using a Lotka-Voltera dynamical system from
+%                       [1].
 %
 %
-%   Reference:
+%   Reference: [1]	A. Ibañez, „Optimal control of the Lotka–Volterra
+%                   system: turnpike property and numerical simulations",
+%                   Journal of Biological Dynamics, Bd. 11, Nr. 1, S.
+%                   25–41, Jan. 2017, doi: 10.1080/17513758.2016.1226435.
 %
 %   License: GNU GENERAL PUBLIC LICENSE Version 3
 %

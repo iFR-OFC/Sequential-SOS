@@ -1,10 +1,14 @@
 % *****+*******************************************************************
 %
-%   Short Description:  Implements the initial guess for the
-%                       Double-pendulum dynamical system.
+%   Short Description:  Implements the initial guess for ROA problem using
+%                       a Double-pendulum dynamical system from [1].
 %
 %
-%   Reference:
+%   Reference: [1]	S. W. Smith, H. Yin, und M. Arcak, „Continuous
+%                   Abstraction of Nonlinear Systems using Sum-of-Squares
+%                   Programming", in 2019 IEEE 58th Conference on Decision
+%                   and Control (CDC), Dez. 2019, S. 8093–8098. doi:
+%                   10.1109/CDC40024.2019.9029776.
 %
 %   License: GNU GENERAL PUBLIC LICENSE Version 3
 %

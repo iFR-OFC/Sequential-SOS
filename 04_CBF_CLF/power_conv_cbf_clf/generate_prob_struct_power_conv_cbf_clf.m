@@ -1,10 +1,14 @@
 % *****+*******************************************************************
 %
-%   Short Description:  Implements the problem struct for the
-%                       Power Converter dynamical system.
+%   Short Description:  Implements the problem struct for CBF-CLF problem
+%                       using a Power Converter dynamical system from [1].
 %
 %
-%   Reference:
+%   Reference: [1]	M. Schneeberger, F. Dörfler, und S. Mastellone, „SOS
+%                   Construction of Compatible Control Lyapunov and Barrier
+%                   Functions", IFAC-PapersOnLine, Bd. 56, Nr. 2, S.
+%                   10428–10434, Jan. 2023, doi:
+%                   10.1016/j.ifacol.2023.10.1058.
 %
 %   License: GNU GENERAL PUBLIC LICENSE Version 3
 %
@@ -79,4 +83,21 @@ probStruct.Name = 'Power-Covnverter'; % Name of example
 
 end
 
- 
+
+function f = power_converter_dynamics(x,u)
+
+x1 = x(1);
+x2 = x(2);
+x3 = x(3);
+
+f0 = [-0.05*x1 - 57.9*x2 + 0.00919*x3;
+    1710*x1 + 314*x3;
+    -0.271*x1 - 314*x2];
+
+g0 = [0.05-57.9, -57.9*x3;
+    1710+1710*x1, 0;
+    0, 1710 + 1710*x1];
+
+
+f = f0+g0*u*1;
+end

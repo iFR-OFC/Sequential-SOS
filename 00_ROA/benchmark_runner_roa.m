@@ -245,7 +245,6 @@ end % end of for-loop for VDP benchmark
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
 
-
 %% Multi-Input-Multi-Output
 
 % define the problem instances based on different polynomial degrees

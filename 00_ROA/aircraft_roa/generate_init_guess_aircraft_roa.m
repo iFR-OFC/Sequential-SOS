@@ -1,10 +1,14 @@
 % *****+*******************************************************************
 %
-%   Short Description:  Implements the initial guess for the Aircraft
-%                       dynamical system.
+%   Short Description:  Implements the initial guess for ROA problem using
+%                       an aircraft dynamical system from [1].
 %
 %
-%   Reference:
+%   Reference: [1]	A. Chakraborty, P. Seiler, und G. J. Balas, „Nonlinear
+%                   region of attraction analysis for flight control
+%                   verification and validation", Control Engineering
+%                   Practice, Bd. 19, Nr. 4, S. 335–345, Apr. 2011, doi:
+%                   10.1016/j.conengprac.2010.12.001.
 %
 %   License: GNU GENERAL PUBLIC LICENSE Version 3
 %

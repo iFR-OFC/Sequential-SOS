@@ -1,10 +1,15 @@
 % *****+*******************************************************************
 %
-%   Short Description:  Implements the problem struct for the Aircraft
-%                       dynamical system.
+%   Short Description:  Implements the problem struct for reachability
+%                       problem using an Aircraft dynamical system from
+%                       [1].
 %
 %
-%   Reference:
+%   Reference: [1]	H. Yin, M. Arcak, A. Packard, und P. Seiler, „Backward
+%                   Reachability for Polynomial Systems on a Finite
+%                   Horizon", IEEE Transactions on Automatic Control, Bd.
+%                   66, Nr. 12, S. 6025–6032, Dez. 2021, doi:
+%                   10.1109/TAC.2021.3056611.
 %
 %   License: GNU GENERAL PUBLIC LICENSE Version 3
 %

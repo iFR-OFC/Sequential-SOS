@@ -1,10 +1,14 @@
 % *****+*******************************************************************
 %
-%   Short Description:  Implements the initial guess for the Satellite
-%                       dynamical system.
+%   Short Description:  Implements the initial guess for control design
+%                       problem using a Satellite dynamical system from
+%                       [1].
 %
 %
-%   Reference:
+%   Reference: [1]	J. L. Junkins und H. Schaub, Analytical Mechanics of
+%                   Space Systems, Second Edition. Reston, VA: American
+%                   Institute of Aeronautics and Astronautics, 2009. doi:
+%                   10.2514/4.867231.
 %
 %   License: GNU GENERAL PUBLIC LICENSE Version 3
 %

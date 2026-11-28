@@ -1,10 +1,12 @@
 % *****+*******************************************************************
 %
-%   Short Description:  Implements the initial guess for the MIMO
-%                       dynamical system.
+%   Short Description:  Implements the initial guess for ROA problem using
+%                       a MIMO dynamical system from [1, p. 84].
 %
 %
-%   Reference:
+%   Reference: [1]	W. Tan, „Nonlinear Control Analysis and Synthesis using
+%                   Sum-of-Squares Programming", University of California,
+%                   Berkeley, 2006.
 %
 %   License: GNU GENERAL PUBLIC LICENSE Version 3
 %

@@ -1,7 +1,7 @@
 % *****+*******************************************************************
 %
-%   Short Description:  Implements the initial guess for the N-link
-%                       robot arm dynamical system.
+%   Short Description:  Implements the initial guess for ROA problem using
+%                       a N-link robot arm dynamical system.
 %
 %
 %   Reference:

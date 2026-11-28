@@ -1,10 +1,14 @@
 % *****+*******************************************************************
 %
-%   Short Description:  Implements the problem struct for the Jet-Engine
-%                       dynamical system.
+%   Short Description:  Implements the problem struct for barrier
+%                       certificate problem using a Jet-Engine dynamical
+%                       system from [1].
 %
 %
-%   Reference:
+%   Reference: [1]	I. R. Manchester und J.-J. E. Slotine, „Output-Feedback
+%                   Control of Nonlinear Systems using Control Contraction
+%                   Metrics and Convex Optimization", 5. Juni 2014, arXiv:
+%                   arXiv:1406.1256. doi: 10.48550/arXiv.1406.1256.
 %
 %   License: GNU GENERAL PUBLIC LICENSE Version 3
 %

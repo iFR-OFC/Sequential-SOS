@@ -1,10 +1,14 @@
 % *****+*******************************************************************
 %
-%   Short Description:  Implements the initial guess for the VDP-coupled
-%                       dynamical system.
+%   Short Description:  Implements the initial guess for CBF-CLF problem
+%                       using a VDP-coupled dynamical system from [1, p.136].
 %
 %
-%   Reference:
+%   Reference: [1]	X. Chen, „Reachability Analysis of Non-Linear Hybrid
+%                   Systems Using Taylor Models", RWTH Aachen, Aachen,
+%                   2015. [Online]. URL:
+%                   https://publications.rwth-aachen.de/record/465295/files
+%                   /465295.pdf
 %
 %   License: GNU GENERAL PUBLIC LICENSE Version 3
 %

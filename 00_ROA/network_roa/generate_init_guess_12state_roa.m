@@ -1,10 +1,13 @@
 % *****+*******************************************************************
 %
-%   Short Description:  Implements the initial guess for the 12 State
-%                       Dynamical System.
+%   Short Description:  Implements the initial guess for ROA problem using
+%                       a 12 State Dynamical System dynamical system [1].
 %
 %
-%   Reference:
+%   Reference: [1]	J. Anderson und A. Papachristodoulou, „Dynamical 
+%                   system decomposition for efficient, sparse analysis", 
+%                   in 49th IEEE Conference on Decision and Control (CDC), 
+%                   Dez. 2010, S. 6565–6570. doi: 10.1109/CDC.2010.5717269.
 %
 %   License: GNU GENERAL PUBLIC LICENSE Version 3
 %
