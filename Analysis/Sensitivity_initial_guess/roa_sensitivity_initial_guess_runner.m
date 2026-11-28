@@ -116,8 +116,8 @@ probNames                       = {}; % problem name per run (for the evaluation
 
 total_benchmark_time_start = tic;
 
-% 
-%% Aircraft 4D
+
+%% Aircraft 
 
 % define the problem instances based on different polynomial degrees
 degV = {2,   2, 2:4, 1:4};
