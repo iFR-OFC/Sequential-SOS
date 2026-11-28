@@ -1,4 +1,4 @@
-function [solStruct] = solve_barrierCert_seq_bench_fun(probStruct,commonOpts,x0,hess_est_method)
+function [solStruct] = benchmark_fun_sq_barrier_cert(probStruct,commonOpts,x0,hess_est_method)
 
 % de-pack for better readability
 x       = probStruct.x;

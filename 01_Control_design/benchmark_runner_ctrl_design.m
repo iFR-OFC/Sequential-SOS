@@ -1,25 +1,26 @@
 %% ***********************************************************************
 %
-%  Barrier Certificate Benchmark Runner
+%  Control Design Benchmark Runner
 %
 %
-%   SOS Problem for Barrier Certificate
+%   SOS Problem for Control Design
 %
-%   min      ||g - (B-β)||
-%   B,s,κ,β 
+%   min      ||g - (V-β)||
+%   V,s,κ,β 
 %
-%   s.j.    s_i                  is SOS
-%           β  - ϵ               is SOS
-%           s1(B-β) - ∇Bf(x,κ)   is SOS
-%           s2(B-β) + κ - u_min   is SOS
-%           s3(B-β) + u_max - κ   is SOS
-%           s4(B-β) - g           is SOS
+%   s.j.    s_i                       is SOS
+%           V  - ϵ(x)                 is SOS
+%           β  - ϵ                    is SOS
+%           s1(V-β) - ∇Vf(x,κ) - ϵ(x) is SOS
+%           s2(V-β) + κ - u_min       is SOS
+%           s3(V-β) + u_max - κ       is SOS
+%           s4(V-β) - g               is SOS
 %
-%   B    - Barrier function
+%   V    - Lyapunov function
 %   s_i  - SOS multipliers
 %   κ    - Control law
 %   β    - Level set
-%   ϵ    - Small term
+%   ϵ(x) - Small term
 %   g    - Safe set/desired operating region
 %   u_min, u_max - Control bounds
 %  
@@ -27,12 +28,14 @@
 %  Overview
 %  
 %  Benchmark 1: VDP
-%  Benchmark 2: Jet-Engine
-%  Benchmark 3: MIMO
-%  Benchmark 4: PowerConv
-%  Benchmark 5: Aircraft (affine)
-%  Benchmark 6: Spacecraft (orbit)
-%  Benchmark 7: Satellite
+%  Benchmark 2: Lotka
+%  Benchmark 3: JetEngine
+%  Benchmark 4: MIMO
+%  Benchmark 5: DoublePendulum
+%  Benchmark 6: Aircraft (affine)
+%  Benchmark 7: Pendubot
+%  Benchmark 8: Spacecraft_orbit
+%  Benchmark 9: Satellite
 %
 %
 %  License: GNU GENERAL PUBLIC LICENSE Version 3
@@ -52,7 +55,7 @@ clc
 maxNumCompThreads(1);
 
 date_of_benchmark = string(datetime("today","Format","dd-MMM-yyyy"));
-name_of_benchmark = 'barrierCert_benchmark';
+name_of_benchmark = 'controlDesign_benchmark';
 
 % get versions
 matlabVersion = version;
@@ -62,14 +65,12 @@ casadiVersion = casadi.CasadiMeta.version;
 runnerDir = pwd;
 
 addPaths  = { ...
-    fullfile(runnerDir,'vdp_barrier_cert'), ...
-    fullfile(runnerDir,'mimo_barrier_cert'), ...
-    fullfile(runnerDir,'aircraft_affine_barrier_cert'), ...
-    fullfile(runnerDir,'pendubot_barrier_cert'),...
-    fullfile(runnerDir,'jet_engine_barrier_cert'),...
-    fullfile(runnerDir,'power_conv_barrier_cert'),...
-    fullfile(runnerDir,'satellite_barrier_cert'), ...
-    fullfile(runnerDir,'spacecraft_orbit_barrier_cert'), ...
+    fullfile(runnerDir,'vdp_ctrl_design'), ...
+    fullfile(runnerDir,'mimo_ctrl_design'), ...
+    fullfile(runnerDir,'aircraft_affine_ctrl_design'), ...
+    fullfile(runnerDir,'pendubot_ctrl_design'),...
+    fullfile(runnerDir,'lotka_voltera_ctrl_design'),...
+    fullfile(runnerDir,'satellite_ctrl_design'), ...
     fullfile(runnerDir,'..','helperFunctions')};
 
 for ii = 1:numel(addPaths)
@@ -77,29 +78,30 @@ for ii = 1:numel(addPaths)
 end
 
 % enable plotting of convergence for each run
-enable_plot_convergence  = false;
-enable_second_sequential = false;
+enable_plot_convergence  = true; 
+
+% enable second run of sequential SOS with different Hessian estimation
+enable_second_sequential = true;
 
 % Hessian estimation methods of the sequential solver to compare
 hess_est_method_1 = 'regularization_frobenius'; % our default (see also sequentialCommon.m)
-hess_est_method_2 = 'damped_bfgs';      % 'damped_bfgs', 'regularization_levenberg', 'regularization_mirror', 'regularization_frobenius'
+hess_est_method_2 =  'damped_bfgs';          % 'damped_bfgs', 'regularization_levenberg', 'regularization_mirror', 'regularization_frobenius'
 
 % common options shared by the methods
 commonOpts.maxiter       = 500;
 commonOpts.tolerance_opt = 1e-4;
 commonOpts.eps_cost      = 1e-6;
 commonOpts.small_prog_count = 10;
-commonOpts.maxSolveTime  = 3600;
+commonOpts.maxSolveTime  =  3600;
 commonOpts.almost_opt_count = 10;
 commonOpts.solver        = 'mosek';
 commonOpts.miniter       = 5; % minimum iterations before an aborted CD run still counts as successful
 
-% MOSEK settings
-
+% Solver settings
 if strcmpi(commonOpts.solver,'mosek')
 
-    commonOpts.sdp_solver_opts.mosek_param = struct( 'MSK_IPAR_NUM_THREADS', 1); 
-    commonOpts.sdp_solver_opts.mosek_echo  = 0;
+    commonOpts.sdp_solver_opts.mosek_param = struct('MSK_IPAR_NUM_THREADS', 1); 
+    commonOpts.sdp_solver_opts.mosek_echo = 0;
 
 elseif strcmpi(commonOpts.solver,'clarabel')
 
@@ -108,20 +110,19 @@ elseif strcmpi(commonOpts.solver,'clarabel')
 
 elseif strcmpi(commonOpts.solver,'scs')
 
-    commonOpts.sdp_solver_opts.dense               = 1;
-    commonOpts.sdp_solver_opts.verbose             = 0;
+    commonOpts.sdp_solver_opts.dense               = 0;
+    commonOpts.sdp_solver_opts.verbose             = 1;
 
 end
 
-
 % variable names of the results table (one row per run)
 tableVariableNames = {'Prob. No.','Problem Name','no. con. (SDP)','no. dec. (SDP)','Size Gram matrices', ...
-                        'Build Time (CD)','Build Time (SQ)','Solve Time (CD)','Solve Time (SQ)', ...
-                        'Iterations (CD)','Iterations (SQ)','time/iter. (CD)','time/iter. (SQ)','Final Cost (CD)','Final Cost (SQ)', ...
-                        'Solved (CD)','Solved (SQ)'};
+    'Build Time (CD)','Build Time (SQ)','Solve Time (CD)','Solve Time (SQ)', ...
+    'Iterations (CD)','Iterations (SQ)','time/iter. (CD)','time/iter. (SQ)','Final Cost (CD)','Final Cost (SQ)', ...
+    'Solved (CD)','Solved (SQ)'};
 
 % extend the results table by the sequential run with the second Hessian
-% estimation method (if enable_second_sequential == 1)
+% estimation method (cf. enable_second_sequential)
 if enable_second_sequential
     tableVariableNames = [tableVariableNames, ...
         ['Build Time (SQ ' hess_est_method_2 ')'], ...
@@ -133,7 +134,7 @@ if enable_second_sequential
 end
 
 % initialize the cell array that accumulates one row per run of the
-% results table
+% results table (one column per table variable)
 tableRows = cell(0, numel(tableVariableNames));
 
 % initialize the cell arrays of stored runs (one entry per run)
@@ -155,21 +156,21 @@ degK = {1:2, 1:2, 1:2, 1:2};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_VDP = generate_prob_struct_vdp_barrier_cert(degV{kk},degK{kk});
+    probStruct_VDP = generate_prob_struct_vdp_ctrl_design(degV{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
-    fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_VDP.Name, kk, numel(degV))
+    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_VDP.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_init_guess_vdp_barrier_cert(probStruct_VDP);
+    x0 = generate_init_guess_vdp_ctrl_design(probStruct_VDP);
 
     % solve VDP example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
-    solStruct_seq_VDP_regularization = solve_barrierCert_seq_bench_fun(probStruct_VDP, ...
-                                                                       commonOpts, ...
-                                                                       x0, ...
-                                                                       hess_est_method);
+    solStruct_seq_VDP_regularization = benchmark_fun_sq_ctrl_design(probStruct_VDP, ...
+                                                                      commonOpts, ...
+                                                                      x0, ...
+                                                                      hess_est_method);
 
     % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_VDP_regularization;
@@ -189,10 +190,10 @@ for kk = 1:numel(degV)
     % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        solStruct_seq_VDP_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_VDP, ...
-                                                                        commonOpts, ...
-                                                                        x0, ...
-                                                                        hess_est_method_2);
+        solStruct_seq_VDP_hessApprox2 = benchmark_fun_sq_ctrl_design(probStruct_VDP, ...
+                                                                       commonOpts, ...
+                                                                       x0, ...
+                                                                       hess_est_method_2);
 
         % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_VDP_hessApprox2;
@@ -213,9 +214,9 @@ for kk = 1:numel(degV)
     end
 
     % solve VDP example with two states using custom coordinate-descent
-    solStruct_CD_VDP = solve_barrierCert_CD_bench_fun(probStruct_VDP, ...
-                                                      commonOpts, ...
-                                                      x0);
+    solStruct_CD_VDP = benchmark_fun_cd_ctrl_design(probStruct_VDP, ...
+                                                     commonOpts, ...
+                                                     x0);
 
     cdSolverStructs{end+1} = solStruct_CD_VDP;
     probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_VDP.Name, kk, numel(degV), commonOpts.solver);
@@ -245,10 +246,115 @@ for kk = 1:numel(degV)
 end % end of for-loop for VDP benchmark
 
 % display the results table accumulated over all runs so far
-disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+disp(cell2table(tableRows,'VariableNames',tableVariableNames));
 
 
-%% Jet-Engine
+
+
+%% Lotka
+
+% define the problem instances based on different polynomial degrees
+degV = {2  , 2:4, 1:4, 2:6};
+degK = {1, 1:2, 1:2, 1:2};
+
+
+for kk = 1:numel(degV)
+
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_Lotka = generate_prob_struct_lotka_voltera_ctrl_design(degV{kk},degK{kk});
+
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_Lotka.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
+
+    % generate an initial guess
+    x0 = generate_init_guess_lotka_voltera_ctrl_design(probStruct_Lotka);
+
+    % solve Lotka example with two states using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_Lotka_regularization = benchmark_fun_sq_ctrl_design(probStruct_Lotka, ...
+                                                                      commonOpts, ...
+                                                                      x0, ...
+                                                                      hess_est_method);
+
+    % store in struct
+    seqSolverStructs_regularization{end+1} = solStruct_seq_Lotka_regularization;
+
+    % extract size and timing statistic from sequential and add some meta
+    % data for plotting
+    evalSequentialStruct_Lotka_regularization                 = evalSequential(solStruct_seq_Lotka_regularization);
+    evalSequentialStruct_Lotka_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_Lotka_regularization.probNumber      = kk;
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    % if enabled compute with second hessian estimation method
+    if enable_second_sequential
+
+        solStruct_seq_Lotka_hessApprox2 = benchmark_fun_sq_ctrl_design(probStruct_Lotka, ...
+                                                                       commonOpts, ...
+                                                                       x0, ...
+                                                                       hess_est_method_2);
+
+        % store in struct
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Lotka_hessApprox2;
+
+        % just some gap in display output
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_Lotka_hessApprox2                 = evalSequential(solStruct_seq_Lotka_hessApprox2);
+        evalSequentialStruct_Lotka_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_Lotka_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_Lotka_hessApprox2 = [];
+        solStruct_seq_Lotka_hessApprox2        = [];
+    end
+
+    % solve Lotka example with two states using custom coordinate-descent
+    solStruct_CD_Lotka = benchmark_fun_cd_ctrl_design(probStruct_Lotka, ...
+                                                       commonOpts, ...
+                                                       x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_Lotka;
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_Lotka.Name, kk, numel(degV), commonOpts.solver);
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    % append the current run to the accumulating results table
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_Lotka, ...
+                                solStruct_CD_Lotka, ...
+                                solStruct_seq_Lotka_regularization, ...
+                                solStruct_seq_Lotka_hessApprox2, ...
+                                true);
+
+    % plot the scaled first order KKT condition over iterations
+    if enable_plot_convergence
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_Lotka_regularization,...
+                            evalSequentialStruct_Lotka_hessApprox2,...
+                            solStruct_CD_Lotka)
+    end
+end % end of for-loop for Lotka benchmark
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames));
+
+
+%% JetEngine
 
 % define the problem instances based on different polynomial degrees
 degV = {2  , 2:4, 1:4, 2:6};
@@ -258,21 +364,21 @@ degK = {1:2, 1:2, 1:2, 1:2};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_JetEngine = generate_prob_struct_jet_engine_barrier_cert(degV{kk},degK{kk});
+    probStruct_JetEngine = generate_prob_struct_jet_engine_ctrl_design(degV{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
-    fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_JetEngine.Name, kk, numel(degV))
+    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_JetEngine.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_init_guess_jet_engine_barrier_cert(probStruct_JetEngine);
+    x0 = generate_init_guess_jet_engine_ctrl_design(probStruct_JetEngine);
 
     % solve JetEngine example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
-    solStruct_seq_JetEngine_regularization = solve_barrierCert_seq_bench_fun(probStruct_JetEngine, ...
-                                                                       commonOpts, ...
-                                                                       x0, ...
-                                                                       hess_est_method);
+    solStruct_seq_JetEngine_regularization = benchmark_fun_sq_ctrl_design(probStruct_JetEngine, ...
+                                                                      commonOpts, ...
+                                                                      x0, ...
+                                                                      hess_est_method);
 
     % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_JetEngine_regularization;
@@ -292,10 +398,10 @@ for kk = 1:numel(degV)
     % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        solStruct_seq_JetEngine_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_JetEngine, ...
-                                                                        commonOpts, ...
-                                                                        x0, ...
-                                                                        hess_est_method_2);
+        solStruct_seq_JetEngine_hessApprox2 = benchmark_fun_sq_ctrl_design(probStruct_JetEngine, ...
+                                                                       commonOpts, ...
+                                                                       x0, ...
+                                                                       hess_est_method_2);
 
         % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_JetEngine_hessApprox2;
@@ -316,9 +422,9 @@ for kk = 1:numel(degV)
     end
 
     % solve JetEngine example with two states using custom coordinate-descent
-    solStruct_CD_JetEngine = solve_barrierCert_CD_bench_fun(probStruct_JetEngine, ...
-                                                            commonOpts, ...
-                                                            x0);
+    solStruct_CD_JetEngine = benchmark_fun_cd_ctrl_design(probStruct_JetEngine, ...
+                                                           commonOpts, ...
+                                                           x0);
 
     cdSolverStructs{end+1} = solStruct_CD_JetEngine;
     probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_JetEngine.Name, kk, numel(degV), commonOpts.solver);
@@ -345,36 +451,39 @@ for kk = 1:numel(degV)
                             evalSequentialStruct_JetEngine_hessApprox2,...
                             solStruct_CD_JetEngine)
     end
-end % end of for-loop for Jet-Engine benchmark
+end % end of for-loop for JetEngine benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
+
+
+
 %% MIMO
 
 % define the problem instances based on different polynomial degrees
-degV = {2  , 2:4, 2:4};
-degK = {1, 1, 1:2};
+degV = {2  , 2:4, 2:6};
+degK = {1:2, 1:2, 1:2};
 
 
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_MiMo = generate_prob_struct_mimo_barrier_cert(degV{kk},degK{kk});
+    probStruct_MiMo = generate_prob_struct_mimo_ctrl_design(degV{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
-    fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_MiMo.Name, kk, numel(degV))
+    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_MiMo.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_init_guess_mimo_barrier_cert(probStruct_MiMo);
+    x0 = generate_init_guess_mimo_ctrl_design(probStruct_MiMo);
 
     % solve MiMo example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
-    solStruct_seq_MiMo_regularization = solve_barrierCert_seq_bench_fun(probStruct_MiMo, ...
-                                                                        commonOpts, ...
-                                                                        x0, ...
-                                                                        hess_est_method);
+    solStruct_seq_MiMo_regularization = benchmark_fun_sq_ctrl_design(probStruct_MiMo, ...
+                                                                       commonOpts, ...
+                                                                       x0, ...
+                                                                       hess_est_method);
 
     % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_MiMo_regularization;
@@ -394,10 +503,10 @@ for kk = 1:numel(degV)
     % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        solStruct_seq_MiMo_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_MiMo, ...
-                                                                         commonOpts, ...
-                                                                         x0, ...
-                                                                         hess_est_method_2);
+        solStruct_seq_MiMo_hessApprox2 = benchmark_fun_sq_ctrl_design(probStruct_MiMo, ...
+                                                                        commonOpts, ...
+                                                                        x0, ...
+                                                                        hess_est_method_2);
 
         % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_MiMo_hessApprox2;
@@ -418,9 +527,9 @@ for kk = 1:numel(degV)
     end
 
     % solve MiMo example with two states using custom coordinate-descent
-    solStruct_CD_MiMo = solve_barrierCert_CD_bench_fun(probStruct_MiMo, ...
-                                                       commonOpts, ...
-                                                       x0);
+    solStruct_CD_MiMo = benchmark_fun_cd_ctrl_design(probStruct_MiMo, ...
+                                                      commonOpts, ...
+                                                      x0);
 
     cdSolverStructs{end+1} = solStruct_CD_MiMo;
     probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_MiMo.Name, kk, numel(degV), commonOpts.solver);
@@ -452,40 +561,41 @@ end % end of for-loop for MIMO benchmark
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
-%% PowerConv
+
+%% DoublePendulum
 
 % define the problem instances based on different polynomial degrees
-degV = {2, 2:4, 2:4};
-degK = {1, 1, 1:2};
+degV = {2, 2,  2:4, 2:6};
+degK = {1, 1:2,1:2, 1:2};
 
 
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_PowerConv = generate_prob_struct_power_conv_barrier_cert(degV{kk},degK{kk});
+    probStruct_DoublePendulum = generate_prob_struct_double_pendulum_ctrl_design(degV{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
-    fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_PowerConv.Name, kk, numel(degV))
+    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_DoublePendulum.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_init_guess_power_conv_barrier_cert(probStruct_PowerConv);
+    x0 = generate_init_guess_double_pendulum_ctrl_design(probStruct_DoublePendulum);
 
-    % solve PowerConv example with two states using sequential SOS
+    % solve DoublePendulum example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
-    solStruct_seq_PowerConv_regularization = solve_barrierCert_seq_bench_fun(probStruct_PowerConv, ...
-                                                                        commonOpts, ...
-                                                                        x0, ...
-                                                                        hess_est_method);
+    solStruct_seq_DoublePendulum_regularization = benchmark_fun_sq_ctrl_design(probStruct_DoublePendulum, ...
+                                                                       commonOpts, ...
+                                                                       x0, ...
+                                                                       hess_est_method);
 
     % store in struct
-    seqSolverStructs_regularization{end+1} = solStruct_seq_PowerConv_regularization;
+    seqSolverStructs_regularization{end+1} = solStruct_seq_DoublePendulum_regularization;
 
     % extract size and timing statistic from sequential and add some meta
     % data for plotting
-    evalSequentialStruct_PowerConv_regularization                 = evalSequential(solStruct_seq_PowerConv_regularization);
-    evalSequentialStruct_PowerConv_regularization.hess_est_method = hess_est_method_1;
-    evalSequentialStruct_PowerConv_regularization.probNumber      = kk;
+    evalSequentialStruct_DoublePendulum_regularization                 = evalSequential(solStruct_seq_DoublePendulum_regularization);
+    evalSequentialStruct_DoublePendulum_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_DoublePendulum_regularization.probNumber      = kk;
 
     % just some gap in display output
     fprintf('\n')
@@ -496,13 +606,13 @@ for kk = 1:numel(degV)
     % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        solStruct_seq_PowerConv_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_PowerConv, ...
-                                                                         commonOpts, ...
-                                                                         x0, ...
-                                                                         hess_est_method_2);
+        solStruct_seq_DoublePendulum_hessApprox2 = benchmark_fun_sq_ctrl_design(probStruct_DoublePendulum, ...
+                                                                        commonOpts, ...
+                                                                        x0, ...
+                                                                        hess_est_method_2);
 
         % store in struct
-        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_PowerConv_hessApprox2;
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_DoublePendulum_hessApprox2;
 
         % just some gap in display output
         fprintf('\n')
@@ -511,21 +621,21 @@ for kk = 1:numel(degV)
         fprintf('\n')
 
         % extract size and timing statistic from sequential
-        evalSequentialStruct_PowerConv_hessApprox2                 = evalSequential(solStruct_seq_PowerConv_hessApprox2);
-        evalSequentialStruct_PowerConv_hessApprox2.hess_est_method = hess_est_method_2;
-        evalSequentialStruct_PowerConv_hessApprox2.probNumber      = kk;
+        evalSequentialStruct_DoublePendulum_hessApprox2                 = evalSequential(solStruct_seq_DoublePendulum_hessApprox2);
+        evalSequentialStruct_DoublePendulum_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_DoublePendulum_hessApprox2.probNumber      = kk;
     else
-        evalSequentialStruct_PowerConv_hessApprox2 = [];
-        solStruct_seq_PowerConv_hessApprox2        = [];
+        evalSequentialStruct_DoublePendulum_hessApprox2 = [];
+        solStruct_seq_DoublePendulum_hessApprox2        = [];
     end
 
-    % solve PowerConv example with two states using custom coordinate-descent
-    solStruct_CD_PowerConv = solve_barrierCert_CD_bench_fun(probStruct_PowerConv, ...
-                                                            commonOpts, ...
-                                                            x0);
+    % solve DoublePendulum example with two states using custom coordinate-descent
+    solStruct_CD_DoublePendulum = benchmark_fun_cd_ctrl_design(probStruct_DoublePendulum, ...
+                                                                commonOpts, ...
+                                                                x0);
 
-    cdSolverStructs{end+1} = solStruct_CD_PowerConv;
-    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_PowerConv.Name, kk, numel(degV), commonOpts.solver);
+    cdSolverStructs{end+1} = solStruct_CD_DoublePendulum;
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_DoublePendulum.Name, kk, numel(degV), commonOpts.solver);
 
     % just some gap in display output
     fprintf('\n')
@@ -535,21 +645,21 @@ for kk = 1:numel(degV)
 
     % append the current run to the accumulating results table
     tableRows = appendResultRow(tableRows, ...
-                                probStruct_PowerConv, ...
-                                solStruct_CD_PowerConv, ...
-                                solStruct_seq_PowerConv_regularization, ...
-                                solStruct_seq_PowerConv_hessApprox2, ...
+                                probStruct_DoublePendulum, ...
+                                solStruct_CD_DoublePendulum, ...
+                                solStruct_seq_DoublePendulum_regularization, ...
+                                solStruct_seq_DoublePendulum_hessApprox2, ...
                                 true);
 
     % plot the scaled first order KKT condition over iterations
     if enable_plot_convergence
             plotConvergence(probNames{end}, ...
                             enable_second_sequential,...
-                            evalSequentialStruct_PowerConv_regularization,...
-                            evalSequentialStruct_PowerConv_hessApprox2,...
-                            solStruct_CD_PowerConv)
+                            evalSequentialStruct_DoublePendulum_regularization,...
+                            evalSequentialStruct_DoublePendulum_hessApprox2,...
+                            solStruct_CD_DoublePendulum)
     end
-end % end of for-loop for PowerConv benchmark
+end % end of for-loop for DoublePendulum benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
@@ -558,28 +668,28 @@ disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 %% Aircraft (affine)
 
 % define the problem instances based on different polynomial degrees
-degV = {2  , 2:4, 2:4};
-degK = {1, 1, 1:2};
+degV = {2  , 2:4, 1:4};
+degK = {1:2, 1:2, 1:2};
 
 
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_Aircraft_affine = generate_prob_struct_aircraft_affine_barrier_cert(degV{kk},degK{kk});
+    probStruct_Aircraft_affine = generate_prob_struct_aircraft_affine_ctrl_design(degV{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
-    fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_Aircraft_affine.Name, kk, numel(degV))
+    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_Aircraft_affine.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_init_guess_aircraft_affine_barrier_cert(probStruct_Aircraft_affine);
+    x0 = generate_init_guess_aircraft_affine_ctrl_design(probStruct_Aircraft_affine);
 
     % solve Aircraft_affine example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
-    solStruct_seq_Aircraft_affine_regularization = solve_barrierCert_seq_bench_fun(probStruct_Aircraft_affine, ...
-                                                                                   commonOpts, ...
-                                                                                   x0, ...
-                                                                                   hess_est_method);
+    solStruct_seq_Aircraft_affine_regularization = benchmark_fun_sq_ctrl_design(probStruct_Aircraft_affine, ...
+                                                                                  commonOpts, ...
+                                                                                  x0, ...
+                                                                                  hess_est_method);
 
     % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_Aircraft_affine_regularization;
@@ -599,10 +709,10 @@ for kk = 1:numel(degV)
     % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        solStruct_seq_Aircraft_affine_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_Aircraft_affine, ...
-                                                                                    commonOpts, ...
-                                                                                    x0, ...
-                                                                                    hess_est_method_2);
+        solStruct_seq_Aircraft_affine_hessApprox2 = benchmark_fun_sq_ctrl_design(probStruct_Aircraft_affine, ...
+                                                                                   commonOpts, ...
+                                                                                   x0, ...
+                                                                                   hess_est_method_2);
 
         % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Aircraft_affine_hessApprox2;
@@ -623,9 +733,9 @@ for kk = 1:numel(degV)
     end
 
     % solve Aircraft_affine example with two states using custom coordinate-descent
-    solStruct_CD_Aircraft_affine = solve_barrierCert_CD_bench_fun(probStruct_Aircraft_affine, ...
-                                                                  commonOpts, ...
-                                                                  x0);
+    solStruct_CD_Aircraft_affine = benchmark_fun_cd_ctrl_design(probStruct_Aircraft_affine, ...
+                                                                 commonOpts, ...
+                                                                 x0);
 
     cdSolverStructs{end+1} = solStruct_CD_Aircraft_affine;
     probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_Aircraft_affine.Name, kk, numel(degV), commonOpts.solver);
@@ -657,7 +767,111 @@ end % end of for-loop for Aircraft (affine) benchmark
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
 
-%% Spacecraft (orbit)
+
+%% Pendubot
+
+% define the problem instances based on different polynomial degrees
+degV = {2  , 2:4, 1:4};
+degK = {1:2, 1:2, 1:2};
+
+
+for kk = 1:numel(degV)
+
+    % generate problem structure (dynamics, polynomial dec. variables)
+    probStruct_Pendubot = generate_prob_struct_pendubot_ctrl_design(degV{kk},degK{kk});
+
+    fprintf('------------------------------------------------------------------------------------------ \n')
+    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_Pendubot.Name, kk, numel(degV))
+    fprintf('------------------------------------------------------------------------------------------\n')
+
+    % generate an initial guess
+    x0 = generate_init_guess_pendubot_ctrl_design(probStruct_Pendubot);
+
+    % solve Pendubot example with two states using sequential SOS
+    hess_est_method = hess_est_method_1;
+    solStruct_seq_Pendubot_regularization = benchmark_fun_sq_ctrl_design(probStruct_Pendubot, ...
+                                                                           commonOpts, ...
+                                                                           x0, ...
+                                                                           hess_est_method);
+
+    % store in struct
+    seqSolverStructs_regularization{end+1} = solStruct_seq_Pendubot_regularization;
+
+    % extract size and timing statistic from sequential and add some meta
+    % data for plotting
+    evalSequentialStruct_Pendubot_regularization                 = evalSequential(solStruct_seq_Pendubot_regularization);
+    evalSequentialStruct_Pendubot_regularization.hess_est_method = hess_est_method_1;
+    evalSequentialStruct_Pendubot_regularization.probNumber      = kk;
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    % if enabled compute with second hessian estimation method
+    if enable_second_sequential
+
+        solStruct_seq_Pendubot_hessApprox2 = benchmark_fun_sq_ctrl_design(probStruct_Pendubot, ...
+                                                                            commonOpts, ...
+                                                                            x0, ...
+                                                                            hess_est_method_2);
+
+        % store in struct
+        seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Pendubot_hessApprox2;
+
+        % just some gap in display output
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+        fprintf('\n')
+
+        % extract size and timing statistic from sequential
+        evalSequentialStruct_Pendubot_hessApprox2                 = evalSequential(solStruct_seq_Pendubot_hessApprox2);
+        evalSequentialStruct_Pendubot_hessApprox2.hess_est_method = hess_est_method_2;
+        evalSequentialStruct_Pendubot_hessApprox2.probNumber      = kk;
+    else
+        evalSequentialStruct_Pendubot_hessApprox2 = [];
+        solStruct_seq_Pendubot_hessApprox2        = [];
+    end
+
+    % solve Pendubot example with two states using custom coordinate-descent
+    solStruct_CD_Pendubot = benchmark_fun_cd_ctrl_design(probStruct_Pendubot, ...
+                                                          commonOpts, ...
+                                                          x0);
+
+    cdSolverStructs{end+1} = solStruct_CD_Pendubot;
+    probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_Pendubot.Name, kk, numel(degV), commonOpts.solver);
+
+    % just some gap in display output
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+    fprintf('\n')
+
+    % append the current run to the accumulating results table
+    tableRows = appendResultRow(tableRows, ...
+                                probStruct_Pendubot, ...
+                                solStruct_CD_Pendubot, ...
+                                solStruct_seq_Pendubot_regularization, ...
+                                solStruct_seq_Pendubot_hessApprox2, ...
+                                true);
+
+    % plot the scaled first order KKT condition over iterations
+    if enable_plot_convergence
+            plotConvergence(probNames{end}, ...
+                            enable_second_sequential,...
+                            evalSequentialStruct_Pendubot_regularization,...
+                            evalSequentialStruct_Pendubot_hessApprox2,...
+                            solStruct_CD_Pendubot)
+    end
+end % end of for-loop for Pendubot benchmark
+
+% display the results table accumulated over all runs so far
+disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
+
+%% Spacecraft_orbit
 
 % define the problem instances based on different polynomial degrees
 degV = {2,   2, 2:4};
@@ -667,21 +881,21 @@ degK = {1, 1:2, 1:2};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_Spacecraft_orbit = generate_prob_struct_spacecraft_orbit_barrier_cert(degV{kk},degK{kk});
+    probStruct_Spacecraft_orbit = generate_prob_struct_spacecraft_orbit_ctrl_design(degV{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
-    fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_Spacecraft_orbit.Name, kk, numel(degV))
+    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_Spacecraft_orbit.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_init_guess_spacecraft_orbit_barrier_cert(probStruct_Spacecraft_orbit);
+    x0 = generate_init_guess_spacecraft_orbit_ctrl_design(probStruct_Spacecraft_orbit);
 
     % solve Spacecraft_orbit example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
-    solStruct_seq_Spacecraft_orbit_regularization = solve_barrierCert_seq_bench_fun(probStruct_Spacecraft_orbit, ...
-                                                                             commonOpts, ...
-                                                                             x0, ...
-                                                                             hess_est_method);
+    solStruct_seq_Spacecraft_orbit_regularization = benchmark_fun_sq_ctrl_design(probStruct_Spacecraft_orbit, ...
+                                                                            commonOpts, ...
+                                                                            x0, ...
+                                                                            hess_est_method);
 
     % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_Spacecraft_orbit_regularization;
@@ -701,10 +915,10 @@ for kk = 1:numel(degV)
     % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        solStruct_seq_Spacecraft_orbit_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_Spacecraft_orbit, ...
-                                                                              commonOpts, ...
-                                                                              x0, ...
-                                                                              hess_est_method_2);
+        solStruct_seq_Spacecraft_orbit_hessApprox2 = benchmark_fun_sq_ctrl_design(probStruct_Spacecraft_orbit, ...
+                                                                             commonOpts, ...
+                                                                             x0, ...
+                                                                             hess_est_method_2);
 
         % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Spacecraft_orbit_hessApprox2;
@@ -725,9 +939,9 @@ for kk = 1:numel(degV)
     end
 
     % solve Spacecraft_orbit example with two states using custom coordinate-descent
-    solStruct_CD_Spacecraft_orbit = solve_barrierCert_CD_bench_fun(probStruct_Spacecraft_orbit, ...
-                                                                   commonOpts, ...
-                                                                   x0);
+    solStruct_CD_Spacecraft_orbit = benchmark_fun_cd_ctrl_design(probStruct_Spacecraft_orbit, ...
+                                                                  commonOpts, ...
+                                                                  x0);
 
     cdSolverStructs{end+1} = solStruct_CD_Spacecraft_orbit;
     probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_Spacecraft_orbit.Name, kk, numel(degV), commonOpts.solver);
@@ -754,10 +968,11 @@ for kk = 1:numel(degV)
                             evalSequentialStruct_Spacecraft_orbit_hessApprox2,...
                             solStruct_CD_Spacecraft_orbit)
     end
-end % end of for-loop for Spacecraft (orbit) benchmark
+end % end of for-loop for Spacecraft_orbit benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
+
 
 %% Satellite
 
@@ -769,21 +984,21 @@ degK = {1, 1:2, 1:2};
 for kk = 1:numel(degV)
 
     % generate problem structure (dynamics, polynomial dec. variables)
-    probStruct_Satellite = generate_prob_struct_satellite_barrier_cert(degV{kk},degK{kk});
+    probStruct_Satellite = generate_prob_struct_satellite_ctrl_design(degV{kk},degK{kk});
 
     fprintf('------------------------------------------------------------------------------------------ \n')
-    fprintf('Barrier Certificate Benchmark for %s Instance %d of %d. \n', probStruct_Satellite.Name, kk, numel(degV))
+    fprintf('Control Design Benchmark for %s Instance %d of %d. \n', probStruct_Satellite.Name, kk, numel(degV))
     fprintf('------------------------------------------------------------------------------------------\n')
 
     % generate an initial guess
-    x0 = generate_init_guess_satellite_barrier_cert(probStruct_Satellite);
+    x0 = generate_init_guess_satellite_ctrl_design(probStruct_Satellite);
 
     % solve Satellite example with two states using sequential SOS
     hess_est_method = hess_est_method_1;
-    solStruct_seq_Satellite_regularization = solve_barrierCert_seq_bench_fun(probStruct_Satellite, ...
-                                                                             commonOpts, ...
-                                                                             x0, ...
-                                                                             hess_est_method);
+    solStruct_seq_Satellite_regularization = benchmark_fun_sq_ctrl_design(probStruct_Satellite, ...
+                                                                            commonOpts, ...
+                                                                            x0, ...
+                                                                            hess_est_method);
 
     % store in struct
     seqSolverStructs_regularization{end+1} = solStruct_seq_Satellite_regularization;
@@ -803,10 +1018,10 @@ for kk = 1:numel(degV)
     % if enabled compute with second hessian estimation method
     if enable_second_sequential
 
-        solStruct_seq_Satellite_hessApprox2 = solve_barrierCert_seq_bench_fun(probStruct_Satellite, ...
-                                                                              commonOpts, ...
-                                                                              x0, ...
-                                                                              hess_est_method_2);
+        solStruct_seq_Satellite_hessApprox2 = benchmark_fun_sq_ctrl_design(probStruct_Satellite, ...
+                                                                             commonOpts, ...
+                                                                             x0, ...
+                                                                             hess_est_method_2);
 
         % store in struct
         seqSolverStructs_hessApprox2{end+1} = solStruct_seq_Satellite_hessApprox2;
@@ -827,9 +1042,9 @@ for kk = 1:numel(degV)
     end
 
     % solve Satellite example with two states using custom coordinate-descent
-    solStruct_CD_Satellite = solve_barrierCert_CD_bench_fun(probStruct_Satellite, ...
-                                                            commonOpts, ...
-                                                            x0);
+    solStruct_CD_Satellite = benchmark_fun_cd_ctrl_design(probStruct_Satellite, ...
+                                                           commonOpts, ...
+                                                           x0);
 
     cdSolverStructs{end+1} = solStruct_CD_Satellite;
     probNames{end+1}       = sprintf('%s (instance %d of %d with %s)', probStruct_Satellite.Name, kk, numel(degV), commonOpts.solver);
@@ -860,7 +1075,6 @@ end % end of for-loop for Satellite benchmark
 
 % display the results table accumulated over all runs so far
 disp(cell2table(tableRows,'VariableNames',tableVariableNames))
-
 
 
 total_benchmark_time = toc(total_benchmark_time_start);
@@ -896,7 +1110,7 @@ save([name_of_benchmark '_' commonOpts.solver '.mat'],...         % name of .mat
 
 fprintf('\n')
 
-%% Performance Profile (Dolan & More, Math. Program. 91, 2002)
+%% Evaluation
 
 
 fprintf('Evaluate benchmark ... \n')
@@ -910,30 +1124,24 @@ if enable_second_sequential
 end
 
 % solver names: one sequential solver per Hessian estimation method plus coordinate descent
-% (explicit loop: arrayfun/concat can produce nested cells, which fprintf rejects)
 solverNames = cell(1, numel(seqMethodNames) + 1);
 for s = 1:numel(seqMethodNames)
     solverNames{s} = ['Sequential (' seqMethodNames{s} ', ' commonOpts.solver ')'];
 end
 solverNames{end} = ['Coordinate-descent',' (' commonOpts.solver ')'];
 
-% evaluate the stored test data: shifted geometric means and the
-% performance profile plots (legend labels passed as inputs)
+% evaluate benchmark
 plotPerformanceProfiles(seqMethodStructs, ...
                         cdSolverStructs, ...
                         solverNames, ...
                         commonOpts.maxSolveTime, ...
                         probNames)
 
-
-
 % final results table accumulated over all runs and all problems
 resultsTable = cell2table(tableRows,'VariableNames',tableVariableNames);
 disp(resultsTable)
 
-
-% remove the added folders from the path again now that the benchmarks
-% are done (exactly the folders added at the top of this script)
+% remove the added folders from the path again
 for ii = 1:numel(addPaths)
     rmpath(addPaths{ii})
 end

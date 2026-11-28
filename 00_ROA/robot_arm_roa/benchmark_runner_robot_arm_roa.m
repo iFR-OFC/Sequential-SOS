@@ -10,9 +10,9 @@
 %  Note 1: The N-link SOS problem differs slightly from the other ROA
 %  examples (the fixed level-set constant enters the constraint but not
 %  the cost), hence the problem-specific scripts
-%  solve_ROA_Nlink_seq_bench_fun.m and solve_ROA_Nlink_CD_bench_fun.m are
+%  benchmark_fun_sq_robot_arm_roa.m and benchmark_fun_cd_robot_arm_roa.m are
 %  used; both follow the structure, inputs, and outputs of the generic
-%  solve_ROA_seq_bench_fun.m and solve_ROA_CD_bench_fun.m.
+%  benchmark_fun_sq_roa.m and benchmark_fun_cd_roa.m.
 %
 %  Note 2: The user might select a second hessian approximation method for
 %  sequential. This is optional, but interesting in terms of convergence
@@ -139,7 +139,7 @@ for kk = 1:(Nmax-Nmin+1)
 
     % solve Nlink example using sequential SOS
     hess_est_method = hess_est_method_1;
-    solStruct_seq_Nlink_regularization = solve_ROA_Nlink_seq_bench_fun(probStruct_Nlink,commonOpts,x0,hess_est_method);
+    solStruct_seq_Nlink_regularization = benchmark_fun_sq_robot_arm_roa(probStruct_Nlink,commonOpts,x0,hess_est_method);
 
     % just some gap in display output
     fprintf('\n')
@@ -160,7 +160,7 @@ for kk = 1:(Nmax-Nmin+1)
     if enable_second_sequential
 
         hess_est_method = hess_est_method_2;
-        solStruct_seq_Nlink_hessApprox2 = solve_ROA_Nlink_seq_bench_fun(probStruct_Nlink,commonOpts,x0,hess_est_method);
+        solStruct_seq_Nlink_hessApprox2 = benchmark_fun_sq_robot_arm_roa(probStruct_Nlink,commonOpts,x0,hess_est_method);
 
         % just some gap in display output
         fprintf('\n')
@@ -180,7 +180,7 @@ for kk = 1:(Nmax-Nmin+1)
     if enable_seq_badInit
         % solve Nlink example with a clearly infeasible initial guess
         x0_bad = generate_init_guess_nlink_bad_init_roa(probStruct_Nlink);
-        solStruct_seq_Nlink_badInit = solve_ROA_Nlink_seq_bench_fun(probStruct_Nlink,commonOpts,x0_bad,hess_est_method_1);
+        solStruct_seq_Nlink_badInit = benchmark_fun_sq_robot_arm_roa(probStruct_Nlink,commonOpts,x0_bad,hess_est_method_1);
 
         % just some gap in display output
         fprintf('\n')
@@ -193,7 +193,7 @@ for kk = 1:(Nmax-Nmin+1)
     end
 
     % solve Nlink example using custom coordinate-descent
-    solStruct_CD_Nlink = solve_ROA_Nlink_CD_bench_fun(probStruct_Nlink,commonOpts,x0);
+    solStruct_CD_Nlink = benchmark_fun_cd_robot_arm_roa(probStruct_Nlink,commonOpts,x0);
 
     % just some gap in display output
     fprintf('\n')

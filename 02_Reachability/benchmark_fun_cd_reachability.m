@@ -1,4 +1,4 @@
-function solStruct = solve_reachability_CD_bench_fun(probStruct,commonOpts,x0)
+function solStruct = benchmark_fun_cd_reachability(probStruct,commonOpts,x0)
 
 % de-pack for better readability
 x       = probStruct.x;

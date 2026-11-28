@@ -1,25 +1,34 @@
-function [solStruct] = solve_ctrlDesign_seq_bench_fun(probStruct,commonOpts,x0,hess_est_method)
+function [solStruct] = benchmark_fun_sq_reachability(probStruct,commonOpts,x0,hess_est_method)
 
 % de-pack for better readability
 x       = probStruct.x;
 u       = probStruct.u;
+t       = probStruct.t;
 f       = probStruct.f;
 g       = probStruct.g;
 s1      = probStruct.s1;
 s2      = probStruct.s2;
 s3      = probStruct.s3;
 s4      = probStruct.s4;
+s5      = probStruct.s5;
+s6      = probStruct.s6;
+s7      = probStruct.s7;
+s8      = probStruct.s8;
+s9      = probStruct.s9;
+gT      = probStruct.gT;
+T       = probStruct.T;
 V       = probStruct.V;
 kappa   = probStruct.kappa;
 b       = probStruct.b;
 
-l = 1e-6*(x'*x);
+% time polynomial
+hT = (t)*(T-t);
 
 umin = probStruct.umin;
 umax = probStruct.umax;
 
 
-%% Setup solver
+%% setup solver
 
 % options
 opts                              = struct('sossol',commonOpts.solver);
@@ -45,24 +54,29 @@ opts.hessian_approx               = hess_est_method;
 
 
 % cost
-cost = dot(g-(V-b),g-(V-b)) ;
+cost = dot( g-(subs(V,t,0)-b), g-(subs(V,t,0)-b) ) ;
 
-sos = struct('x',[V; s1;s2;s3;s4;kappa;b],... % decision variables
-    'f',cost, ...                             % cost
-    'p',[]);                                  % parameter
+sos = struct('x',[V; kappa; s1; s2; s3; s4; s5; s6; s7; s8; s9; b],... % decision variables
+    'f',cost, ...                                              % cost
+    'p',[]);                                                   % parameter
 
-% SOS constraints
+% constraints
 sos.('g') = [
              s1;
              s2;
              s3;
              s4;
-             V-l;
-             b - 1e-6;
-             s1*(V-b)-nabla(V,x)*subs(f,u,kappa)-l;
-             s2*(V-b) + kappa - umin;
-             s3*(V-b) + umax - kappa;
-             s4*(V-b) -  g
+             s5;
+             s6;
+             s7;
+             s8;
+             s9;
+             b ;
+             s1*(V-b) - s2*hT - nabla(V,t) - nabla(V,x)*subs(f,u,kappa);
+             s3*(V-b) - s4*hT + kappa - umin;
+             s5*(V-b) - s6*hT + umax - kappa;
+             s7*(V-b) - s8*hT - g;
+             s9*(subs(V,t,T)-b) - gT
             ];
 
 % states + constraint cones
@@ -72,7 +86,7 @@ opts.sossol_options.newton_solver =[];
 opts.tolerance_opt                = commonOpts.tolerance_opt;
 
 % setup solver
-S = casos.nlsossol('S1','sequential',sos,opts);
+S = casos.nlsossol('S','sequential',sos,opts);
 
 % solve problem
 sol = S('x0' ,x0);

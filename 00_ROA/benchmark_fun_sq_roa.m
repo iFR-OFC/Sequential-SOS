@@ -1,25 +1,4 @@
-%--------------------------------------------------------------------------
-%
-%   Short Description:  Calculate an inner-estimate of the
-%                       region-of-attraction for the N-link robot arm
-%                       using sequential SOS.
-%
-%                       Note: In contrast to the other ROA examples (see
-%                       solve_ROA_seq_bench_fun.m), the squared distance of
-%                       V itself to the safe set is minimized; the fixed
-%                       level-set constant b enters the SOS constraint
-%                       only. The structure, inputs, and outputs are
-%                       identical to solve_ROA_seq_bench_fun.m.
-%
-%   Reference:  T. Cunis and J. Olucak,
-%   "CaΣoS: A nonlinear sum-of-squares optimization suite⋆,"
-%    2025 American Control Conference (ACC), Denver, CO,
-%    USA, 2025, pp. 1659-1666, doi: 10.23919/ACC63710.2025.11107794.
-%
-%   License: GNU GENERAL PUBLIC LICENSE Version 3
-%--------------------------------------------------------------------------
-
-function [solStruct] = solve_ROA_Nlink_seq_bench_fun(probStruct,commonOpts,x0,hess_est_method)
+function [solStruct] = benchmark_fun_sq_roa(probStruct,commonOpts,x0,hess_est_method)
 
 % de-pack for better readability
 x       = probStruct.x;
@@ -39,6 +18,7 @@ l = 1e-6*(x'*x);
 opts                              = struct('sossol',commonOpts.solver);
 opts.max_iter                     = commonOpts.maxiter;
 opts.max_time                     = commonOpts.maxSolveTime;
+opts.almost_opt_count             = commonOpts.almost_opt_count;
 
 if  strcmpi(commonOpts.solver,'mosek')
 
@@ -58,8 +38,8 @@ end
 opts.hessian_approx               = hess_est_method;
 
 
-% cost: squared distance of V to the safe set (no level-set shift)
-cost = dot(g-V,g-V) ;
+% cost
+cost = dot(g-(V-b),g-(V-b)) ;
 
 sos = struct('x',[V; s1],... % decision variables
     'f',cost, ...            % cost
@@ -67,8 +47,8 @@ sos = struct('x',[V; s1],... % decision variables
 
 % SOS constraints
 sos.('g') = [
-             V-l;
              s1;
+             V-l;
              s1*(V-b)-nabla(V,x)*f-l
             ];
 
